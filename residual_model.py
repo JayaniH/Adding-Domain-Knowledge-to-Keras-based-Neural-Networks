@@ -51,7 +51,7 @@ for name, group in df:
     (trainX, testX) = datasets.process_attributes(train, test)
 
     model = models.create_residual_model(trainX.shape[1])
-    opt = Adam(learning_rate=1e-2, decay=1e-3/200)
+    opt = Adam(learning_rate=1e-3, decay=1e-3/200)
     model.compile(loss=root_mean_squared_percentage_error, optimizer=opt)
 
     print("[INFO] training model...")
