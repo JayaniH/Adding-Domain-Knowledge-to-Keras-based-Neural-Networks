@@ -7,6 +7,7 @@ import os
 
 def load_data():
     df = pd.read_csv('performance_data_truncated.csv', sep="\t")
+    df = df[df.wip < 1500]
     df = df.groupby(by="api_name")
 
     return df

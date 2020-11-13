@@ -7,6 +7,14 @@ import matplotlib.pyplot as plt
 import datasets
 
 EPSILON =  1e-6
+top_5 = [
+    'ballerina/http/Client#post#http://hotel-mock-svc:8090',
+    'ballerina/http/Caller#respond',
+    'ballerina/http/HttpClient#forward',
+    'ballerina/http/HttpClient#post',
+    'ballerina/http/Client#get#https://covidapi.info/api/v1',
+]
+top_5_preds = {}
 
 def fit_with_2deg_up_polynomial_regression_improved(x,y):
     coeffients = np.polyfit(x, y, 2)
@@ -82,6 +90,10 @@ def run():
         print("Prediction Loss RMSPE: ", error)
         pred_loss.append(error)
 
+        if name in top_5:
+            preds = model.predict(np.arange(0, group.wip.max()))
+            top_5_preds[name] = preds
+
     mean_train_loss = np.mean(train_loss)
     percentile_train_loss = np.percentile(train_loss, 95)
     
@@ -100,5 +112,8 @@ def run():
 
     print("Mean loss", mean_loss)
     print("95th percentile loss", percentile_loss)
+
+def domain_forecast():
+    return top_5_preds
 
 run()
