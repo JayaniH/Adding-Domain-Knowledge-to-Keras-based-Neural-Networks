@@ -14,7 +14,15 @@ top_5 = [
     'ballerina/http/HttpClient#post',
     'ballerina/http/Client#get#https://covidapi.info/api/v1',
 ]
-top_5_preds = {}
+test_apis = [
+    'ballerina/http/Client#forward#http://13.90.39.240:8602',
+    'ballerina/http/Client#get#https://ap15.salesforce.com',
+    'ballerina/http/Client#patch#https://graph.microsoft.com',
+    'ballerina/http/Client#post#https://login.salesforce.com/services/oauth2/token',
+    'ballerinax/sfdc/SObjectClient#createRecord'
+]
+top_5_preds_domain = {}
+test_preds_domain ={}
 
 def fit_with_2deg_up_polynomial_regression_improved(x,y):
     coeffients = np.polyfit(x, y, 2)
@@ -90,9 +98,15 @@ def run():
         print("Prediction Loss RMSPE: ", error)
         pred_loss.append(error)
 
+        x = np.arange(0, group.wip.max(), 0.1)
+
         if name in top_5:
-            preds = model.predict(np.arange(0, group.wip.max()))
-            top_5_preds[name] = preds
+            preds = model.predict(x)
+            top_5_preds_domain[name] = preds
+
+        if name in test_apis:
+            preds = model.predict(x)
+            test_preds_domain[name] = preds
 
     mean_train_loss = np.mean(train_loss)
     percentile_train_loss = np.percentile(train_loss, 95)
@@ -114,6 +128,6 @@ def run():
     print("95th percentile loss", percentile_loss)
 
 def domain_forecast():
-    return top_5_preds
+    return top_5_preds_domain, test_preds_domain
 
 run()

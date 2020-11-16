@@ -5,9 +5,7 @@ from sklearn.model_selection import train_test_split
 import datasets
 import models
 import numpy as np
-import argparse
-import locale
-import os
+import pandas as pd
 
 
 def root_mean_squared_error(y_true, y_pred):
@@ -26,9 +24,17 @@ top_5 = [
     'ballerina/http/HttpClient#post',
     'ballerina/http/Client#get#https://covidapi.info/api/v1',
 ]
+test_apis = [
+    'ballerina/http/Client#forward#http://13.90.39.240:8602',
+    'ballerina/http/Client#get#https://ap15.salesforce.com',
+    'ballerina/http/Client#patch#https://graph.microsoft.com',
+    'ballerina/http/Client#post#https://login.salesforce.com/services/oauth2/token',
+    'ballerinax/sfdc/SObjectClient#createRecord'
+]
 top_5_preds = {}
+test_preds_regression = {}
 
-# results_file = open("./results/regression_results.txt", "w")
+results_file = open("./results/regression_results.txt", "w")
 
 # load data
 print("[INFO] loading data...")
@@ -39,13 +45,13 @@ for name, group in df:
     # if name == "ballerina/http/Caller#respond":
     #     continue
 
-    if name not in top_5:
+    if (name not in top_5) and (name not in test_apis):
         continue
 
     print(name, "\n")
     
-    # results_file.write(name)
-    # results_file.write("\n")
+    results_file.write(name)
+    results_file.write("\n")
 
     print("[INFO] constructing training/testing split...")
     (train, test) = train_test_split(group, test_size=0.3, random_state=42)
@@ -93,14 +99,28 @@ for name, group in df:
     # plt.savefig('./Plots/loss/' + name.replace("/", "_") + '_loss.png')
     # plt.close()
 
+    x = np.arange(0, group.wip.max(), 0.1)
+    # preds = model.predict(x)
+    # test_preds_regression[name] = preds
+
+    # results = pd.DataFrame({'x': x, 'y_pred': preds})
+    # results_file.write(str(results))
+    # results_file.write(str(preds))
+
+
     if name in top_5:
-        preds = model.predict(np.arange(0, group.wip.max()))
+        preds = model.predict(x)
         top_5_preds[name] = preds
-        print('preds', name, preds)
+        # print('preds', name, preds)
+
+    if name in test_apis:
+        preds = model.predict(x)
+        test_preds_regression[name] = preds
+        # print('preds', name, preds)
 
 
 
-print(top_5_preds)
+print(test_preds_regression)
 
 mean_loss = np.mean(loss)
 mean_val_loss = np.mean(validation_loss)
@@ -114,7 +134,11 @@ print("95th percentile loss/val_loss", percentile_loss, percentile_val_loss)
 # results_file.write("\nMean loss/val_loss %s / %s" % (mean_loss, mean_val_loss)) 
 # results_file.write("\n95th percentile loss/val_loss %s / %s" % (percentile_loss, percentile_val_loss)) 
 
-# results_file.close()
+results_file.write("\ntop 5")
+results_file.write(str(top_5_preds))
+results_file.write("\ntest")
+results_file.write(str(test_preds_regression))
+results_file.close()
 
 def regression_forecast():
-    return top_5_preds
+    return top_5_preds, test_preds_regression

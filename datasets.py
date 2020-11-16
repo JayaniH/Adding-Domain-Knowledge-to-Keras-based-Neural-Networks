@@ -2,8 +2,7 @@ from sklearn.preprocessing import LabelBinarizer
 from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
 import numpy as np
-import glob
-import os
+
 
 def load_data():
     df = pd.read_csv('performance_data_truncated.csv', sep="\t")

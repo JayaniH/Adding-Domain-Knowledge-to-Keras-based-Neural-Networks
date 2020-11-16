@@ -14,7 +14,15 @@ top_5 = [
     'ballerina/http/HttpClient#post',
     'ballerina/http/Client#get#https://covidapi.info/api/v1',
 ]
-top_5_preds = {}
+test_apis = [
+    'ballerina/http/Client#forward#http://13.90.39.240:8602',
+    'ballerina/http/Client#get#https://ap15.salesforce.com',
+    'ballerina/http/Client#patch#https://graph.microsoft.com',
+    'ballerina/http/Client#post#https://login.salesforce.com/services/oauth2/token',
+    'ballerinax/sfdc/SObjectClient#createRecord'
+]
+top_5_preds_xgb = {}
+test_preds_xgb = {}
 
 df = datasets.load_data()
 
@@ -37,12 +45,15 @@ for name, group in df:
     rmspe = (np.sqrt(np.mean(np.square((y_test - preds) / (y_test + EPSILON))))) * 100
     loss.append(rmspe)
 
-    # forecast for top 5 APIs
     if name in top_5:
-        preds = xg_reg.predict(np.arange(0, int(group.wip.max()) + 1).reshape(int(group.wip.max())+ 1,1))
-        top_5_preds[name] = preds
+        preds = xg_reg.predict(np.arange(0, int(group.wip.max()) + 1, 0.1).reshape((int(group.wip.max())+ 1)*10,1))
+        top_5_preds_xgb[name] = preds
 
-print(top_5_preds)
+    if name in test_apis:
+        preds = xg_reg.predict(np.arange(0, int(group.wip.max()) + 1, 0.1).reshape((int(group.wip.max())+ 1)*10,1))
+        test_preds_xgb[name] = preds
+
+# print(top_5_preds_xgb)
 
 mean_loss = np.mean(loss)
 
@@ -54,4 +65,4 @@ print("Mean loss", mean_loss)
 print("95th percentile loss", percentile_loss)
 
 def xgb_regression_forecast():
-    return top_5_preds
+    return top_5_preds_xgb, test_preds_xgb
