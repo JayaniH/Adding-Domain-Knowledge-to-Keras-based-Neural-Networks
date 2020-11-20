@@ -7,12 +7,17 @@ import matplotlib.pyplot as plt
 import datasets
 
 EPSILON =  1e-6
-top_5 = [
-    'ballerina/http/Client#post#http://hotel-mock-svc:8090',
-    'ballerina/http/Caller#respond',
-    'ballerina/http/HttpClient#forward',
-    'ballerina/http/HttpClient#post',
+high_loss_apis = [
     'ballerina/http/Client#get#https://covidapi.info/api/v1',
+    'ballerina/http/Client#get#http://postman-echo.com',
+    'ballerina/http/Client#post#http://airline-mock-svc:8090',
+    'ballerina/http/Client#post#http://car-mock-svc:8090',
+    'ballerina/http/Client#post#http://hotel-mock-svc:8090',
+    'ballerina/http/HttpCachingClient#forward',
+    'ballerina/http/Caller#respond',
+    'ballerina/http/HttpClient#get',
+    'ballerina/http/HttpClient#post',
+    'ballerina/http/HttpCachingClient#post'
 ]
 test_apis = [
     'ballerina/http/Client#forward#http://13.90.39.240:8602',
@@ -98,15 +103,15 @@ def run():
         print("Prediction Loss RMSPE: ", error)
         pred_loss.append(error)
 
-        x = np.arange(0, group.wip.max(), 0.1)
+        x = np.arange(0, group.wip.max() +1 , 0.1)
+        preds = model.predict(x)
+        test_preds_domain[name] = preds
 
-        if name in top_5:
-            preds = model.predict(x)
-            top_5_preds_domain[name] = preds
+        # if name in high_loss_apis:
+        #     top_5_preds_domain[name] = preds
 
-        if name in test_apis:
-            preds = model.predict(x)
-            test_preds_domain[name] = preds
+        # if name in test_apis:
+        #     test_preds_domain[name] = preds
 
     mean_train_loss = np.mean(train_loss)
     percentile_train_loss = np.percentile(train_loss, 95)

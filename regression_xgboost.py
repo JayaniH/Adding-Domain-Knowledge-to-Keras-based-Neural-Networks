@@ -7,12 +7,17 @@ import datasets
 loss = []
 EPSILON =  1e-6
 
-top_5 = [
-    'ballerina/http/Client#post#http://hotel-mock-svc:8090',
-    'ballerina/http/Caller#respond',
-    'ballerina/http/HttpClient#forward',
-    'ballerina/http/HttpClient#post',
+high_loss_apis = [
     'ballerina/http/Client#get#https://covidapi.info/api/v1',
+    'ballerina/http/Client#get#http://postman-echo.com',
+    'ballerina/http/Client#post#http://airline-mock-svc:8090',
+    'ballerina/http/Client#post#http://car-mock-svc:8090',
+    'ballerina/http/Client#post#http://hotel-mock-svc:8090',
+    'ballerina/http/HttpCachingClient#forward',
+    'ballerina/http/Caller#respond',
+    'ballerina/http/HttpClient#get',
+    'ballerina/http/HttpClient#post',
+    'ballerina/http/HttpCachingClient#post'
 ]
 test_apis = [
     'ballerina/http/Client#forward#http://13.90.39.240:8602',
@@ -45,13 +50,16 @@ for name, group in df:
     rmspe = (np.sqrt(np.mean(np.square((y_test - preds) / (y_test + EPSILON))))) * 100
     loss.append(rmspe)
 
-    if name in top_5:
-        preds = xg_reg.predict(np.arange(0, int(group.wip.max()) + 1, 0.1).reshape((int(group.wip.max())+ 1)*10,1))
-        top_5_preds_xgb[name] = preds
+    preds = xg_reg.predict(np.arange(0, int(group.wip.max()) + 1, 0.1).reshape((int(group.wip.max())+ 1)*10,1))
+    test_preds_xgb[name] = preds
 
-    if name in test_apis:
-        preds = xg_reg.predict(np.arange(0, int(group.wip.max()) + 1, 0.1).reshape((int(group.wip.max())+ 1)*10,1))
-        test_preds_xgb[name] = preds
+    # if name in high_loss_apis:
+    #     preds = xg_reg.predict(np.arange(0, int(group.wip.max()) + 1, 0.1).reshape((int(group.wip.max())+ 1)*10,1))
+    #     top_5_preds_xgb[name] = preds
+
+    # if name in test_apis:
+    #     preds = xg_reg.predict(np.arange(0, int(group.wip.max()) + 1, 0.1).reshape((int(group.wip.max())+ 1)*10,1))
+    #     test_preds_xgb[name] = preds
 
 # print(top_5_preds_xgb)
 
