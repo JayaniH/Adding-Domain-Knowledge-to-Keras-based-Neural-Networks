@@ -133,6 +133,6 @@ def run():
     print("95th percentile loss", percentile_loss)
 
 def domain_forecast():
-    return top_5_preds_domain, test_preds_domain
+    return test_preds_domain
 
 run()
