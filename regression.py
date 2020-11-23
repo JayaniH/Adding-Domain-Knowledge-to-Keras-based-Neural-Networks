@@ -22,25 +22,25 @@ scalery = MinMaxScaler()
 
 loss = []
 validation_loss = []
-high_loss_apis = [
-    'ballerina/http/Client#get#https://covidapi.info/api/v1',
-    'ballerina/http/Client#get#http://postman-echo.com',
-    'ballerina/http/Client#post#http://airline-mock-svc:8090',
-    'ballerina/http/Client#post#http://car-mock-svc:8090',
-    'ballerina/http/Client#post#http://hotel-mock-svc:8090',
-    'ballerina/http/HttpCachingClient#forward',
-    'ballerina/http/Caller#respond',
-    'ballerina/http/HttpClient#get',
-    'ballerina/http/HttpClient#post',
-    'ballerina/http/HttpCachingClient#post'
-]
-test_apis = [
-    'ballerina/http/Client#forward#http://13.90.39.240:8602',
-    'ballerina/http/Client#get#https://ap15.salesforce.com',
-    'ballerina/http/Client#patch#https://graph.microsoft.com',
-    'ballerina/http/Client#post#https://login.salesforce.com/services/oauth2/token',
-    'ballerinax/sfdc/SObjectClient#createRecord'
-]
+# high_loss_apis = [
+#     'ballerina/http/Client#get#https://covidapi.info/api/v1',
+#     'ballerina/http/Client#get#http://postman-echo.com',
+#     'ballerina/http/Client#post#http://airline-mock-svc:8090',
+#     'ballerina/http/Client#post#http://car-mock-svc:8090',
+#     'ballerina/http/Client#post#http://hotel-mock-svc:8090',
+#     'ballerina/http/HttpCachingClient#forward',
+#     'ballerina/http/Caller#respond',
+#     'ballerina/http/HttpClient#get',
+#     'ballerina/http/HttpClient#post',
+#     'ballerina/http/HttpCachingClient#post'
+# ]
+# test_apis = [
+#     'ballerina/http/Client#forward#http://13.90.39.240:8602',
+#     'ballerina/http/Client#get#https://ap15.salesforce.com',
+#     'ballerina/http/Client#patch#https://graph.microsoft.com',
+#     'ballerina/http/Client#post#https://login.salesforce.com/services/oauth2/token',
+#     'ballerinax/sfdc/SObjectClient#createRecord'
+# ]
 top_5_preds = {}
 test_preds_regression = {}
 
@@ -88,13 +88,13 @@ def train_model():
 
         model = models.create_model(trainX.shape[1])
         opt = Adam(learning_rate=1e-2, decay=1e-3/200)
-        model.compile(loss=root_mean_squared_percentage_error, optimizer=opt)
+        model.compile(loss="mean_absolute_percentage_error", optimizer=opt)
 
         print("[INFO] training model...")
         history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=500, batch_size=4)
 
         # save model
-        model.save('../models2/' + name.replace("/", "_"))
+        model.save('../models_mape/' + name.replace("/", "_"))
         
         # get final loss
         loss.append(history.history['loss'][-1])
@@ -128,10 +128,10 @@ def train_model():
     # results_file.write("\nMean loss/val_loss %s / %s" % (mean_loss, mean_val_loss)) 
     # results_file.write("\n95th percentile loss/val_loss %s / %s" % (percentile_loss, percentile_val_loss)) 
 
-    results_file.write("\ntop 5")
-    results_file.write(str(top_5_preds))
-    results_file.write("\ntest")
-    results_file.write(str(test_preds_regression))
+    results_file.write("\nloss")
+    results_file.write(str(loss))
+    results_file.write("\nval_loss")
+    results_file.write(str(validation_loss))
     results_file.close()
 
 
@@ -141,16 +141,18 @@ def run_regression():
         # if name == "ballerina/http/Caller#respond":
         #     continue
 
+        # print(group.latency.min())
+
         (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
         maxLatency = train["latency"].max()
 
-        model = keras.models.load_model('../models2/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../models_mape/' + name.replace("/", "_"), compile=False)
         x = np.arange(0, group.wip.max() +1 , 0.1)
         preds = model.predict(scalerx.fit_transform(x.reshape(-1, 1)))
         preds = preds * maxLatency
         test_preds_regression[name] = preds
-        print(preds)
+        # print(preds)
 
         # results_file.write(str(preds))
 
@@ -160,15 +162,15 @@ def run_regression():
         # if name in test_apis:
         #     test_preds_regression[name] = preds
 
+        plt.yscale("log")
         plt.scatter(group.wip, group.latency)
         plt.plot(x, preds, 'r', label='regression')
-        plt.yscale("log")
         plt.title(name)
         plt.xlabel('wip')
         plt.ylabel('latency')
         plt.legend()
-        plt.show()
-        # plt.savefig('../Plots/scale_y_div_max/' + name.replace("/", "_") + '_loss.png')
+        # plt.show()
+        plt.savefig('../Plots/regression_plots/' + name.replace("/", "_") + '_loss.png')
         plt.close()
 
 
@@ -177,5 +179,5 @@ def regression_forecast():
     return top_5_preds, test_preds_regression
 
 
-train_model()
-# run_regression()
+# train_model()
+run_regression()
