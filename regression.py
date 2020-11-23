@@ -22,18 +22,18 @@ scalery = MinMaxScaler()
 
 loss = []
 validation_loss = []
-# high_loss_apis = [
-#     'ballerina/http/Client#get#https://covidapi.info/api/v1',
-#     'ballerina/http/Client#get#http://postman-echo.com',
-#     'ballerina/http/Client#post#http://airline-mock-svc:8090',
-#     'ballerina/http/Client#post#http://car-mock-svc:8090',
-#     'ballerina/http/Client#post#http://hotel-mock-svc:8090',
-#     'ballerina/http/HttpCachingClient#forward',
-#     'ballerina/http/Caller#respond',
-#     'ballerina/http/HttpClient#get',
-#     'ballerina/http/HttpClient#post',
-#     'ballerina/http/HttpCachingClient#post'
-# ]
+high_loss_apis = [
+    'ballerina/http/Client#post#http://hotel-mock-svc:8090',
+    'ballerina/http/Client#get#http://postman-echo.com',
+    'ballerina/http/Client#get#https://covidapi.info/api/v1',
+    'ballerina/http/Client#post#http://airline-mock-svc:8090',
+    'ballerina/http/Client#post#http://car-mock-svc:8090',
+    'ballerina/http/HttpClient#forward',
+    'ballerina/http/Caller#respond',
+    'ballerina/http/HttpClient#post',
+    'ballerina/http/HttpClient#get',
+    'ballerina/http/HttpCachingClient#post'
+]
 # test_apis = [
 #     'ballerina/http/Client#forward#http://13.90.39.240:8602',
 #     'ballerina/http/Client#get#https://ap15.salesforce.com',
@@ -44,21 +44,21 @@ validation_loss = []
 top_5_preds = {}
 test_preds_regression = {}
 
-results_file = open("./results/regression_results.txt", "w")
-
 # load data
 print("[INFO] loading data...")
 df = datasets.load_data()
 
 
 def train_model():
+    results_file = open("./results/regression_results.txt", "w")
+
     for name, group in df:
 
         # if name == "ballerina/http/Caller#respond":
         #     continue
 
-        # if (name not in high_loss_apis) and (name not in test_apis):
-        #     continue
+        if name not in high_loss_apis:
+            continue
 
         print(name, "\n")
         
@@ -88,13 +88,13 @@ def train_model():
 
         model = models.create_model(trainX.shape[1])
         opt = Adam(learning_rate=1e-2, decay=1e-3/200)
-        model.compile(loss="mean_absolute_percentage_error", optimizer=opt)
+        model.compile(loss=root_mean_squared_error, optimizer=opt)
 
         print("[INFO] training model...")
         history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=500, batch_size=4)
 
         # save model
-        model.save('../models_mape/' + name.replace("/", "_"))
+        model.save('../models/test_models_rmse/' + name.replace("/", "_"))
         
         # get final loss
         loss.append(history.history['loss'][-1])
@@ -106,8 +106,6 @@ def train_model():
 
         # results_file.write(str(history.history))
         # results_file.write("\n\n")
-
-        # model.evaluate(testX, testY, batch_size=8)
 
         #################################
 
@@ -141,26 +139,24 @@ def run_regression():
         # if name == "ballerina/http/Caller#respond":
         #     continue
 
+        if name not in high_loss_apis:
+            continue
+        
         # print(group.latency.min())
 
         (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
         maxLatency = train["latency"].max()
 
-        model = keras.models.load_model('../models_mape/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../models/test_models_rmse/' + name.replace("/", "_"), compile=False)
+
         x = np.arange(0, group.wip.max() +1 , 0.1)
         preds = model.predict(scalerx.fit_transform(x.reshape(-1, 1)))
         preds = preds * maxLatency
         test_preds_regression[name] = preds
+        
         # print(preds)
-
         # results_file.write(str(preds))
-
-        # if name in high_loss_apis:
-        #     top_5_preds[name] = preds
-
-        # if name in test_apis:
-        #     test_preds_regression[name] = preds
 
         plt.yscale("log")
         plt.scatter(group.wip, group.latency)
@@ -170,7 +166,7 @@ def run_regression():
         plt.ylabel('latency')
         plt.legend()
         # plt.show()
-        plt.savefig('../Plots/regression_plots/' + name.replace("/", "_") + '_loss.png')
+        plt.savefig('../Plots/regression_test_plots_rmse/' + name.replace("/", "_") + '_loss.png')
         plt.close()
 
 

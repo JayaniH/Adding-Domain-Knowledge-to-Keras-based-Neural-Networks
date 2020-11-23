@@ -1,0 +1,13 @@
+ballerina/http/Caller#respond
+ballerina/http/Client#get#http://postman-echo.com
+ballerina/http/Client#get#https://covidapi.info/api/v1
+ballerina/http/Client#post#http://airline-mock-svc:8090
+ballerina/http/Client#post#http://car-mock-svc:8090
+ballerina/http/Client#post#http://hotel-mock-svc:8090
+ballerina/http/HttpCachingClient#post
+ballerina/http/HttpClient#forward
+ballerina/http/HttpClient#get
+ballerina/http/HttpClient#post
+
+loss[0.0014488237211480737, 0.009780717082321644, 0.0034049809910357, 0.008443688973784447, 0.0029823591466993093, 0.01530369557440281, 0.006053626537322998, 0.051062971353530884, 0.00909425225108862, 0.005809742491692305]
+val_loss[0.0014232848770916462, 0.006863483227789402, 0.0029117907397449017, 0.0134453559294343, 0.002193944528698921, 0.017364297062158585, 0.00412491150200367, 0.05064950883388519, 0.007627399172633886, 0.004756028763949871]
