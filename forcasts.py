@@ -3,6 +3,7 @@ import pandas as pd
 import regression
 import regression_xgboost
 import domain_model2
+import domain_model3
 import seaborn as sns
 import matplotlib.pyplot as plt 
 
@@ -26,6 +27,7 @@ test_apis = [
     'ballerinax/sfdc/SObjectClient#createRecord'
 ]
 
+
 df = pd.read_csv('performance_data_truncated.csv', sep="\t")
 df = df[df['wip'] < 1500]
 
@@ -33,13 +35,13 @@ df1 = df[df['api_name'].isin(high_loss_apis)]
 df2 = df[df['api_name'].isin(test_apis)]
 
 regression.run_regression()
-domain_model2.run()
+domain_model3.run()
 
 xgboost_top5_preds, xgboost_test_preds = regression_xgboost.xgb_regression_forecast()
 
 regression_top5__preds, regression_test_preds = regression.regression_forecast()
 
-domain_top5_preds, domain_test_preds = domain_model2.domain_forecast()
+domain_test_preds = domain_model2.domain_forecast()
 
 # data_plot = pd.DataFrame({"api_name":high_loss_apis, "wip": df.wip, "latency": df.latency, "xgboost": xgboost_preds, "domain": domain_preds, "wip_all": np.arange(0, 1500)})
 # g = sns.FacetGrid(data_plot, col="api_name", col_wrap=5)
@@ -108,6 +110,7 @@ results_file = open("./results/predictions.txt", "w")
 
 
 df = df.groupby(by="api_name")
+i = 0
 
 for name, group in df:
 
@@ -118,17 +121,19 @@ for name, group in df:
 
     x = np.arange(0, group.wip.max() +1 , 0.1)
 
+    # plt.yscale("log")
     plt.scatter(group.wip, group.latency)
-    plt.plot(x, regression_test_preds[name], 'r', label='regression')
+    # plt.plot(x, regression_test_preds[name], 'r', label='regression')
     plt.plot(np.arange(0, int(group.wip.max()) + 1, 0.1), xgboost_test_preds[name], 'm', label='xgboost')
     plt.plot(x, domain_test_preds[name], 'y', label='domain')
-    plt.yscale("log")
     plt.title(name)
     plt.xlabel('wip')
     plt.ylabel('latency')
     plt.legend()
+    # plt.figtext(0.5, 0, "regression val_loss: " + str(val_loss[i]), fontsize=11)
     # plt.show()
-    plt.savefig('../Plots/forecasts/' + name.replace("/", "_") + '.png')
+    plt.savefig('../Plots/domain_plots/' + name.replace("/", "_") + '.png')
     plt.close()
+    i=i+1
 
 results_file.close()
