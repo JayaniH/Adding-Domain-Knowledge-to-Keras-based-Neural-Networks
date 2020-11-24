@@ -8,6 +8,7 @@ import datasets
 import models
 import numpy as np
 import pandas as pd
+import pickle as pkl
 
 
 def root_mean_squared_error(y_true, y_pred):
@@ -17,8 +18,6 @@ def root_mean_squared_percentage_error(y_true, y_pred):
     EPSILON =  1e-6
     return (K.sqrt(K.mean(K.square((y_true - y_pred) / (y_true + EPSILON))))) * 100
 
-scalerx = MinMaxScaler()
-scalery = MinMaxScaler()
 
 loss = []
 validation_loss = []
@@ -34,13 +33,13 @@ high_loss_apis = [
     'ballerina/http/HttpClient#get',
     'ballerina/http/HttpCachingClient#post'
 ]
-# test_apis = [
-#     'ballerina/http/Client#forward#http://13.90.39.240:8602',
-#     'ballerina/http/Client#get#https://ap15.salesforce.com',
-#     'ballerina/http/Client#patch#https://graph.microsoft.com',
-#     'ballerina/http/Client#post#https://login.salesforce.com/services/oauth2/token',
-#     'ballerinax/sfdc/SObjectClient#createRecord'
-# ]
+test_apis = [
+    'ballerina/http/Client#get#https://ap15.salesforce.com',
+    'ballerina/http/Client#post#https://ap15.salesforce.com',
+    'ballerina/http/Client#post#https://login.salesforce.com/services/oauth2/token',
+    'ballerinax/sfdc/QueryClient#getQueryResult',
+    'ballerinax/sfdc/SObjectClient#createOpportunity'
+]
 top_5_preds = {}
 test_preds_regression = {}
 
@@ -78,27 +77,37 @@ def train_model():
         # trainY = scalery.fit_transform(train["latency"].values.reshape(-1,1))
         # testY = scalery.fit_transform(test["latency"].values.reshape(-1,1))
     
-        # print(train["latency"], trainY.shape, testY.shape)
-
+        # scale X
         # (trainX, testX) = datasets.process_attributes(train, test)
+        scalerx = MinMaxScaler()
+
         trainX = scalerx.fit_transform(train["wip"].values.reshape(-1,1))
-        testX = scalerx.fit_transform(test["wip"].values.reshape(-1,1))
+        testX = scalerx.transform(test["wip"].values.reshape(-1,1))
+        # testX = scalerx.fit_transform(test["wip"].values.reshape(-1,1))
+
+        with open("../models/scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb") as outfile:
+            pkl.dump(scalerx, outfile)
 
         # print(train["wip"], trainX.shape, testX.shape)
 
         model = models.create_model(trainX.shape[1])
         opt = Adam(learning_rate=1e-2, decay=1e-3/200)
-        model.compile(loss=root_mean_squared_error, optimizer=opt)
+        model.compile(loss="mean_absolute_error", optimizer=opt)
 
         print("[INFO] training model...")
         history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=500, batch_size=4)
 
         # save model
-        model.save('../models/test_models_rmse/' + name.replace("/", "_"))
+        model.save('../models/test_models_mae/' + name.replace("/", "_"))
         
         # get final loss
         loss.append(history.history['loss'][-1])
         validation_loss.append(history.history['val_loss'][-1])
+
+        # preds for dataset
+        pred_y = model.predict(testX, batch_size=4)
+        print("Test MAE", np.mean(np.abs(testY.values - pred_y)))
+        pred_y = pred_y * maxLatency
 
         # record results
         # print(history.history)
@@ -134,46 +143,67 @@ def train_model():
 
 
 def run_regression():
+    error = []
     for name, group in df:
 
         # if name == "ballerina/http/Caller#respond":
         #     continue
 
-        if name not in high_loss_apis:
+        if name not in test_apis:
             continue
-        
+
         # print(group.latency.min())
+
+        infile = open("../models/scalars/scaler_" + name.replace("/", "_") + ".pkl", "rb")
+        scalerx = pkl.load(infile)
 
         (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
         maxLatency = train["latency"].max()
 
-        model = keras.models.load_model('../models/test_models_rmse/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../models/test_models_mae/' + name.replace("/", "_"), compile=False)
 
-        x = np.arange(0, group.wip.max() +1 , 0.1)
-        preds = model.predict(scalerx.fit_transform(x.reshape(-1, 1)))
+        # with open("scaler.pkl", "rb") as infile:
+        #     scaler = pkl.load(infile)
+        #     X_test_scaled = scalerx.transform(X_test)
+
+        # preds for regression curve
+        x = np.arange(0, group.wip.max() +0.1 , 0.01)
+        preds = model.predict(scalerx.transform(x.reshape(-1, 1)))
         preds = preds * maxLatency
         test_preds_regression[name] = preds
         
         # print(preds)
         # results_file.write(str(preds))
 
-        plt.yscale("log")
-        plt.scatter(group.wip, group.latency)
-        plt.plot(x, preds, 'r', label='regression')
+        # preds for dataset
+        testX = scalerx.transform(test["wip"].values.reshape(-1,1))
+        testY = test["latency"] / maxLatency
+
+        pred_y = model.predict(testX, batch_size=4)
+        # error.append(np.mean(np.abs(testY.values - pred_y)))
+        pred_y = pred_y * maxLatency
+        # error.append(np.mean(np.abs(test["latency"].values - pred_y)))
+
+        # plt.yscale("log")
+        plt.scatter(group.wip, group.latency, label='data')
+        plt.scatter(test["wip"], pred_y, label='test data')
+        plt.plot(x, preds, 'r', label='regression line')
         plt.title(name)
         plt.xlabel('wip')
         plt.ylabel('latency')
         plt.legend()
         # plt.show()
-        plt.savefig('../Plots/regression_test_plots_rmse/' + name.replace("/", "_") + '_loss.png')
+        plt.savefig('../Plots/regression_test_plots_mae/' + name.replace("/", "_") + '_loss.png')
         plt.close()
+
+    print("\n".join([str(l) for l in error]), "\n\n")
 
 
 
 def regression_forecast():
-    return top_5_preds, test_preds_regression
+    return test_preds_regression
 
 
-# train_model()
-run_regression()
+train_model()
+# run_regression()
