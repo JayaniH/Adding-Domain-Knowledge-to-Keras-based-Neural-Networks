@@ -39,27 +39,32 @@ def run():
         testY = test["latency"]
 
         print("[INFO] fittinig parameters...")
-        params, cov = curve_fit(USL, trainX, trainY)
+        params, cov = curve_fit(USL, trainX, trainY, bounds=([0,0,0],[np.inf, 10, np.inf]))
         print("Fitteed Parameters: ", params)
 
+        equation_params.append(params)
         [s, k, l] = params
 
         predY = USL(testX, s, k, l)
 
         #rmspe
-        error = (np.sqrt(np.mean(np.square((testY - predY) / (testY + EPSILON))))) * 100
+        # error = (np.sqrt(np.mean(np.square((testY - predY) / (testY + EPSILON))))) * 100
         
         # mean absolute percentage error
         # error = np.mean(np.abs((testY - predY) / (testY + EPSILON))) * 100
+
+
+        # mean absolute error
+        error = np.mean(np.abs(testY - predY))
         
         print("Loss: ", error)
         loss.append(error)
 
-        x = np.arange(0, group.wip.max() +1 , 0.1)
+        x = np.arange(0, group.wip.max() +0.1 , 0.01)
         y = USL(x, s, k, l)
         test_preds_domain[name] = y
 
-        plt.yscale("log")
+        # plt.yscale("log")
         plt.scatter(group.wip, group.latency)
         plt.plot(x, y, 'y', label='domain')
         plt.title(name)
@@ -73,7 +78,7 @@ def run():
 
     mean_loss = np.mean(loss)
     percentile_loss = np.percentile(loss, 95)
-
+    print("-------Domain Model--------")
     print("\n".join([str(l) for l in equation_params]), "\n\n")
 
     print("\n".join([str(l) for l in loss]), "\n\n")
@@ -87,4 +92,4 @@ def run():
 def domain_forecast():
     return test_preds_domain
 
-run()
+# run()
