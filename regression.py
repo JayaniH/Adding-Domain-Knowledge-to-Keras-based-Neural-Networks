@@ -28,7 +28,7 @@ high_loss_apis = [
     'ballerina/http/Client#post#http://airline-mock-svc:8090',
     'ballerina/http/Client#post#http://car-mock-svc:8090',
     'ballerina/http/HttpClient#forward',
-    'ballerina/http/Caller#respond',
+    # 'ballerina/http/Caller#respond',
     'ballerina/http/HttpClient#post',
     'ballerina/http/HttpClient#get',
     'ballerina/http/HttpCachingClient#post'
@@ -40,7 +40,6 @@ test_apis = [
     'ballerinax/sfdc/QueryClient#getQueryResult',
     'ballerinax/sfdc/SObjectClient#createOpportunity'
 ]
-top_5_preds = {}
 test_preds_regression = {}
 
 # load data
@@ -53,11 +52,11 @@ def train_model():
 
     for name, group in df:
 
-        # if name == "ballerina/http/Caller#respond":
-        #     continue
-
-        if name not in high_loss_apis:
+        if name == "ballerina/http/Caller#respond":
             continue
+
+        # if name not in high_loss_apis:
+        #     continue
 
         print(name, "\n")
         
@@ -73,22 +72,21 @@ def train_model():
         maxLatency = train["latency"].max()
         trainY = train["latency"] / maxLatency
         testY = test["latency"] / maxLatency
-
-        # trainY = scalery.fit_transform(train["latency"].values.reshape(-1,1))
-        # testY = scalery.fit_transform(test["latency"].values.reshape(-1,1))
     
         # scale X
         # (trainX, testX) = datasets.process_attributes(train, test)
+
         scalerx = MinMaxScaler()
 
         trainX = scalerx.fit_transform(train["wip"].values.reshape(-1,1))
         testX = scalerx.transform(test["wip"].values.reshape(-1,1))
-        # testX = scalerx.fit_transform(test["wip"].values.reshape(-1,1))
 
-        with open("../models/scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb") as outfile:
-            pkl.dump(scalerx, outfile)
+        # with open("../models/test_models_mae/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb") as outfile:
+        #     pkl.dump(scalerx, outfile)
 
-        # print(train["wip"], trainX.shape, testX.shape)
+        outfile = open("../models/test_models_mae/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb")
+        pkl.dump(scalerx, outfile)
+        outfile.close()
 
         model = models.create_model(trainX.shape[1])
         opt = Adam(learning_rate=1e-2, decay=1e-3/200)
@@ -111,14 +109,11 @@ def train_model():
 
         # record results
         # print(history.history)
-
-
         # results_file.write(str(history.history))
         # results_file.write("\n\n")
 
         #################################
 
-    print(test_preds_regression)
 
     mean_loss = np.mean(loss)
     mean_val_loss = np.mean(validation_loss)
@@ -149,13 +144,14 @@ def run_regression():
         # if name == "ballerina/http/Caller#respond":
         #     continue
 
-        if name not in test_apis:
-            continue
+        # if (name not in high_loss_apis) and (name not in test_apis):
+        #     continue
 
         # print(group.latency.min())
 
-        infile = open("../models/scalars/scaler_" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../models/test_models_mae/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "rb")
         scalerx = pkl.load(infile)
+        infile.close()
 
         (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
@@ -172,9 +168,6 @@ def run_regression():
         preds = model.predict(scalerx.transform(x.reshape(-1, 1)))
         preds = preds * maxLatency
         test_preds_regression[name] = preds
-        
-        # print(preds)
-        # results_file.write(str(preds))
 
         # preds for dataset
         testX = scalerx.transform(test["wip"].values.reshape(-1,1))
@@ -194,10 +187,10 @@ def run_regression():
         plt.ylabel('latency')
         plt.legend()
         # plt.show()
-        plt.savefig('../Plots/regression_test_plots_mae/' + name.replace("/", "_") + '_loss.png')
+        # plt.savefig('../Plots/regression_test_plots_mae/' + name.replace("/", "_") + '_loss.png')
         plt.close()
 
-    print("\n".join([str(l) for l in error]), "\n\n")
+    # print("\n".join([str(l) for l in error]), "\n\n")
 
 
 
