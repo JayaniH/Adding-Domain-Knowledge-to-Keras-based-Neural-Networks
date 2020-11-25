@@ -8,23 +8,23 @@ loss = []
 EPSILON =  1e-6
 
 high_loss_apis = [
-    'ballerina/http/Client#get#https://covidapi.info/api/v1',
+    'ballerina/http/Client#post#http://hotel-mock-svc:8090',
     'ballerina/http/Client#get#http://postman-echo.com',
+    'ballerina/http/Client#get#https://covidapi.info/api/v1',
     'ballerina/http/Client#post#http://airline-mock-svc:8090',
     'ballerina/http/Client#post#http://car-mock-svc:8090',
-    'ballerina/http/Client#post#http://hotel-mock-svc:8090',
-    'ballerina/http/HttpCachingClient#forward',
-    'ballerina/http/Caller#respond',
-    'ballerina/http/HttpClient#get',
+    'ballerina/http/HttpClient#forward',
+    # 'ballerina/http/Caller#respond',
     'ballerina/http/HttpClient#post',
+    'ballerina/http/HttpClient#get',
     'ballerina/http/HttpCachingClient#post'
 ]
 test_apis = [
-    'ballerina/http/Client#forward#http://13.90.39.240:8602',
     'ballerina/http/Client#get#https://ap15.salesforce.com',
-    'ballerina/http/Client#patch#https://graph.microsoft.com',
+    'ballerina/http/Client#post#https://ap15.salesforce.com',
     'ballerina/http/Client#post#https://login.salesforce.com/services/oauth2/token',
-    'ballerinax/sfdc/SObjectClient#createRecord'
+    'ballerinax/sfdc/QueryClient#getQueryResult',
+    'ballerinax/sfdc/SObjectClient#createOpportunity'
 ]
 top_5_preds_xgb = {}
 test_preds_xgb = {}
@@ -32,6 +32,9 @@ test_preds_xgb = {}
 df = datasets.load_data()
 
 for name, group in df:
+    if (name not in high_loss_apis) and (name not in test_apis):
+        continue
+
     X = group["wip"].values.reshape(group["wip"].shape[0],1)
     y = group["latency"]
 
@@ -47,19 +50,14 @@ for name, group in df:
 
     preds = xg_reg.predict(X_test)
 
-    rmspe = (np.sqrt(np.mean(np.square((y_test - preds) / (y_test + EPSILON))))) * 100
-    loss.append(rmspe)
+    # rmspe = (np.sqrt(np.mean(np.square((y_test - preds) / (y_test + EPSILON))))) * 100
+    mae = np.mean(np.abs(y_test - preds))
+    loss.append(mae)
 
-    preds = xg_reg.predict(np.arange(0, int(group.wip.max()) + 1, 0.1).reshape((int(group.wip.max())+ 1)*10,1))
+    preds = xg_reg.predict(np.arange(0, group.wip.max() + 0.1, 0.01).reshape(-1, 1))
     test_preds_xgb[name] = preds
 
-    # if name in high_loss_apis:
-    #     preds = xg_reg.predict(np.arange(0, int(group.wip.max()) + 1, 0.1).reshape((int(group.wip.max())+ 1)*10,1))
-    #     top_5_preds_xgb[name] = preds
-
-    # if name in test_apis:
-    #     preds = xg_reg.predict(np.arange(0, int(group.wip.max()) + 1, 0.1).reshape((int(group.wip.max())+ 1)*10,1))
-    #     test_preds_xgb[name] = preds
+    # print(name, preds)
 
 # print(top_5_preds_xgb)
 
@@ -67,10 +65,11 @@ mean_loss = np.mean(loss)
 
 percentile_loss = np.percentile(loss, 95)
 
+print("-------Regression XGBoost--------")
 print("\n".join([str(l) for l in loss]), "\n\n")
 
 print("Mean loss", mean_loss)
 print("95th percentile loss", percentile_loss)
 
 def xgb_regression_forecast():
-    return top_5_preds_xgb, test_preds_xgb
+    return test_preds_xgb
