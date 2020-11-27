@@ -52,10 +52,10 @@ def train_model():
 
     for name, group in df:
 
-        if name == "ballerina/http/Caller#respond":
-            continue
+        # if name == "ballerina/http/Caller#respond":
+        #     continue
 
-        # if name not in high_loss_apis:
+        # if name not in test_apis:
         #     continue
 
         print(name, "\n")
@@ -81,8 +81,7 @@ def train_model():
         trainX = scalerx.fit_transform(train["wip"].values.reshape(-1,1))
         testX = scalerx.transform(test["wip"].values.reshape(-1,1))
 
-        # with open("../models/test_models_mae/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb") as outfile:
-        #     pkl.dump(scalerx, outfile)
+        # save scaler
 
         outfile = open("../models/test_models_mae/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb")
         pkl.dump(scalerx, outfile)
@@ -99,12 +98,12 @@ def train_model():
         model.save('../models/test_models_mae/' + name.replace("/", "_"))
         
         # get final loss
-        loss.append(history.history['loss'][-1])
-        validation_loss.append(history.history['val_loss'][-1])
+        loss.append(history.history['loss'][-1] * maxLatency)
+        validation_loss.append(history.history['val_loss'][-1] * maxLatency)
 
         # preds for dataset
         pred_y = model.predict(testX, batch_size=4)
-        print("Test MAE", np.mean(np.abs(testY.values - pred_y)))
+        # print("Test RMSE", np.sqrt(np.mean(np.square(testY.values - pred_y))) * maxLatency)
         pred_y = pred_y * maxLatency
 
         # record results
@@ -141,8 +140,8 @@ def run_regression():
     error = []
     for name, group in df:
 
-        # if name == "ballerina/http/Caller#respond":
-        #     continue
+        if name == "ballerina/http/Caller#respond":
+            continue
 
         # if (name not in high_loss_apis) and (name not in test_apis):
         #     continue
@@ -168,6 +167,8 @@ def run_regression():
         preds = model.predict(scalerx.transform(x.reshape(-1, 1)))
         preds = preds * maxLatency
         test_preds_regression[name] = preds
+
+        print(name, preds)
 
         # preds for dataset
         testX = scalerx.transform(test["wip"].values.reshape(-1,1))

@@ -64,8 +64,8 @@ i = 0
 
 for name, group in df:
 
-    if (name not in high_loss_apis) and (name not in test_apis):
-        continue
+    # if (name not in high_loss_apis) and (name not in test_apis):
+    #     continue
 
     results_file.write(name)
     results_file.write("\n")
@@ -73,21 +73,20 @@ for name, group in df:
     results_file.write("\n")
 
     x = np.arange(0, group.wip.max() + 0.1 , 0.01)
-    print(xgboost_test_preds[name])
 
     # plt.yscale("log")
     plt.scatter(group.wip, group.latency)
-    # plt.plot(x, regression_test_preds[name], 'r', label='regression')
+    plt.plot(x, regression_test_preds[name], 'r', label='regression')
     plt.plot(x, xgboost_test_preds[name], 'm', label='xgboost')
-    # plt.plot(x, domain_test_preds[name], 'y', label='domain')
+    plt.plot(x, domain_test_preds[name], 'y', label='domain')
     plt.title(name)
     plt.xlabel('wip')
     plt.ylabel('latency')
     plt.ylim(ymin=0)
     plt.legend()
     # plt.figtext(0.5, 0, "regression val_loss: " + str(val_loss[i]), fontsize=11)
-    plt.show()
-    # plt.savefig('../Plots/forecasts_new/' + name.replace("/", "_") + '.png')
+    # plt.show()
+    plt.savefig('../Plots/forecasts_new/' + name.replace("/", "_") + '.png')
     plt.close()
     i=i+1
 

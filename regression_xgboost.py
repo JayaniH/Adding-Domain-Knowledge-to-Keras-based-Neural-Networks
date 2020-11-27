@@ -32,8 +32,8 @@ test_preds_xgb = {}
 df = datasets.load_data()
 
 for name, group in df:
-    if (name not in high_loss_apis) and (name not in test_apis):
-        continue
+    # if (name not in high_loss_apis) and (name not in test_apis):
+    #     continue
 
     X = group["wip"].values.reshape(group["wip"].shape[0],1)
     y = group["latency"]
