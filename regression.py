@@ -21,6 +21,7 @@ def root_mean_squared_percentage_error(y_true, y_pred):
 
 loss = []
 validation_loss = []
+sample_loss = []
 high_loss_apis = [
     'ballerina/http/Client#post#http://hotel-mock-svc:8090',
     'ballerina/http/Client#get#http://postman-echo.com',
@@ -58,6 +59,8 @@ def train_model():
         # if name not in test_apis:
         #     continue
 
+        group = datasets.remove_outliers(group)
+
         print(name, "\n")
         
         results_file.write(name)
@@ -83,7 +86,7 @@ def train_model():
 
         # save scaler
 
-        outfile = open("../models/test_models_mae/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb")
+        outfile = open("../models/mae_outliers_removed/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb")
         pkl.dump(scalerx, outfile)
         outfile.close()
 
@@ -95,16 +98,34 @@ def train_model():
         history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=500, batch_size=4)
 
         # save model
-        model.save('../models/test_models_mae/' + name.replace("/", "_"))
+        model.save('../models/mae_outliers_removed/' + name.replace("/", "_"))
         
         # get final loss
         loss.append(history.history['loss'][-1] * maxLatency)
         validation_loss.append(history.history['val_loss'][-1] * maxLatency)
 
+        # evaluation using bucket method
+        error = []
+
+        for i in range(5):
+            test_sample = datasets.get_test_sample(test)
+            testX = scalerx.transform(test_sample["wip"].values.reshape(-1,1))
+            testY = test_sample["latency"] / maxLatency
+
+            predY = model.predict(testX)
+            mae = np.mean(np.abs(testY.values - predY))
+            error.append(mae)
+
+            # print("test sample ", i, " ", test.shape, test_sample.shape, testY.mean(), mae)
+
+        avg_error = np.mean(error)
+        print("Loss: ", avg_error)
+        sample_loss.append(avg_error * maxLatency)
+
         # preds for dataset
-        pred_y = model.predict(testX, batch_size=4)
+        # pred_y = model.predict(testX, batch_size=4)
         # print("Test RMSE", np.sqrt(np.mean(np.square(testY.values - pred_y))) * maxLatency)
-        pred_y = pred_y * maxLatency
+        # pred_y = pred_y * maxLatency
 
         # record results
         # print(history.history)
@@ -116,15 +137,18 @@ def train_model():
 
     mean_loss = np.mean(loss)
     mean_val_loss = np.mean(validation_loss)
+    mean_sample_loss = np.mean(sample_loss)
 
     percentile_loss = np.percentile(loss, 95)
     percentile_val_loss = np.percentile(validation_loss, 95)
+    percentile_sample_loss = np.percentile(sample_loss, 95)
 
     print("\n".join([str(l) for l in loss]), "\n\n")
     print("\n".join([str(l) for l in validation_loss]), "\n\n")
+    print("\n".join([str(l) for l in sample_loss]), "\n\n")
 
-    print("Mean loss/val_loss", mean_loss, mean_val_loss)
-    print("95th percentile loss/val_loss", percentile_loss, percentile_val_loss)
+    print("Mean loss/val_loss/sample_loss", mean_loss, mean_val_loss, mean_sample_loss)
+    print("95th percentile loss/val_loss/sample_loss", percentile_loss, percentile_val_loss, percentile_sample_loss)
 
     # results_file.write("\nMean loss/val_loss %s / %s" % (mean_loss, mean_val_loss)) 
     # results_file.write("\n95th percentile loss/val_loss %s / %s" % (percentile_loss, percentile_val_loss)) 
@@ -140,15 +164,15 @@ def run_regression():
     error = []
     for name, group in df:
 
-        if name == "ballerina/http/Caller#respond":
-            continue
-
-        # if (name not in high_loss_apis) and (name not in test_apis):
+        # if name == "ballerina/http/Caller#respond":
         #     continue
+
+        if (name not in test_apis):
+            continue
 
         # print(group.latency.min())
 
-        infile = open("../models/test_models_mae/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../models/mae_outliers_removed/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "rb")
         scalerx = pkl.load(infile)
         infile.close()
 
@@ -156,7 +180,7 @@ def run_regression():
 
         maxLatency = train["latency"].max()
 
-        model = keras.models.load_model('../models/test_models_mae/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../models/mae_outliers_removed/' + name.replace("/", "_"), compile=False)
 
         # with open("scaler.pkl", "rb") as infile:
         #     scaler = pkl.load(infile)
@@ -168,7 +192,7 @@ def run_regression():
         preds = preds * maxLatency
         test_preds_regression[name] = preds
 
-        print(name, preds)
+        # print(name, preds)
 
         # preds for dataset
         testX = scalerx.transform(test["wip"].values.reshape(-1,1))
@@ -187,7 +211,7 @@ def run_regression():
         plt.xlabel('wip')
         plt.ylabel('latency')
         plt.legend()
-        # plt.show()
+        plt.show()
         # plt.savefig('../Plots/regression_test_plots_mae/' + name.replace("/", "_") + '_loss.png')
         plt.close()
 

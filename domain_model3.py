@@ -101,7 +101,6 @@ def run():
         # plt.savefig('../Plots/domain_model3_new/' + name.replace("/", "_") + '.png')
         plt.close()
 
-
     mean_loss = np.mean(loss)
     percentile_loss = np.percentile(loss, 95)
 
