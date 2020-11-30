@@ -8,6 +8,7 @@ from scipy.optimize import curve_fit
 import datasets
 
 test_preds_domain ={}
+parameters = {}
 
 # USL equation
 def USL(n, s, k, l):
@@ -16,7 +17,7 @@ def USL(n, s, k, l):
 
 def run():
 
-    avg_loss = []
+    sample_loss = []
     loss = []
     equation_params = []
     EPSILON =  1e-6
@@ -41,7 +42,9 @@ def run():
 
         print("[INFO] fittinig parameters...")
         params, cov = curve_fit(USL, trainX, trainY, bounds=([0,0,0],[np.inf, 10, np.inf]))
+
         print("Fitteed Parameters: ", params)
+        parameters[name] = params
 
         equation_params.append(params)
         [s, k, l] = params
@@ -56,14 +59,15 @@ def run():
             testY = test_sample["latency"]
 
             predY = USL(testX, s, k, l)
-            mae = np.mean(np.abs(testY - predY))
-            error.append(mae)
+            # mae = np.mean(np.abs(testY - predY))
+            rmse = np.sqrt(np.mean(np.square(testY - predY)))
+            error.append(rmse)
 
             # print("test sample ", i, " ", test.shape, test_sample.shape, testY.mean(), mae)
 
         avg_error = np.mean(error)
         print("Loss: ", avg_error)
-        avg_loss.append(avg_error)
+        sample_loss.append(avg_error)
 
         #rmspe
         # error = (np.sqrt(np.mean(np.square((testY - predY) / (testY + EPSILON))))) * 100
@@ -80,11 +84,12 @@ def run():
         testY = test["latency"]
 
         predY = USL(testX, s, k, l)
-        mae = np.mean(np.abs(testY - predY))
-        print("Error with whole test set/avg using bucket method: ", mae, avg_error)
+        # mae = np.mean(np.abs(testY - predY))
+        rmse = np.sqrt(np.mean(np.square(testY - predY)))
+        print("Error with whole test set/avg using bucket method: ", rmse, avg_error)
         
-        print("Loss: ", mae)
-        loss.append(mae)
+        print("Loss: ", rmse)
+        loss.append(rmse)
 
         x = np.arange(0, group.wip.max() +0.1 , 0.01)
         y = USL(x, s, k, l)
@@ -102,22 +107,22 @@ def run():
         plt.close()
 
     mean_loss = np.mean(loss)
+    median_loss = np.percentile(loss, 50)
     percentile_loss = np.percentile(loss, 95)
 
-    mean_avg_loss = np.mean(avg_loss)
-    percentile_avg_loss = np.percentile(avg_loss, 95)
+    mean_sample_loss = np.mean(sample_loss)
+    median_sample_loss = np.percentile(sample_loss, 50)
+    percentile_sample_loss = np.percentile(sample_loss, 95)
 
     print("-------Domain Model--------")
     print("\n".join([str(l) for l in equation_params]), "\n\n")
 
-    print("\n".join([str(l) for l in avg_loss]), "\n\n")
     print("\n".join([str(l) for l in loss]), "\n\n")
+    print("\n".join([str(l) for l in sample_loss]), "\n\n")
 
-    print("Mean loss", mean_loss)
-    print("95th percentile loss", percentile_loss)
-
-    print("Mean avg_loss", mean_avg_loss)
-    print("95th percentile avg_loss", percentile_avg_loss)
+    print("Mean loss/sample_loss", mean_loss, mean_sample_loss)
+    print("Median loss/sample_loss", median_loss, median_sample_loss)
+    print("95th percentile loss/sample_loss", percentile_loss, percentile_sample_loss)
 
     # results_file.write("\nMean loss %s" % (mean_loss)) 
     # results_file.write("\n95th percentile loss %s" % (percentile_loss)) 
@@ -125,4 +130,12 @@ def run():
 def domain_forecast():
     return test_preds_domain
 
-run()
+def predict(api,wip):
+    print("[INFO] predicting d_latency...")
+
+    [s, k, l] = parameters[api]
+    d_latency = USL(wip, s, k, l)
+
+    return d_latency
+
+# run()

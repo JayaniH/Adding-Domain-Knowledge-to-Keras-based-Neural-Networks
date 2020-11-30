@@ -86,19 +86,19 @@ def train_model():
 
         # save scaler
 
-        outfile = open("../models/mae_outliers_removed/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb")
+        outfile = open("../models/rmse_outliers_removed/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb")
         pkl.dump(scalerx, outfile)
         outfile.close()
 
         model = models.create_model(trainX.shape[1])
         opt = Adam(learning_rate=1e-2, decay=1e-3/200)
-        model.compile(loss="mean_absolute_error", optimizer=opt)
+        model.compile(loss=root_mean_squared_error, optimizer=opt)
 
         print("[INFO] training model...")
         history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=500, batch_size=4)
 
         # save model
-        model.save('../models/mae_outliers_removed/' + name.replace("/", "_"))
+        model.save('../models/rmse_outliers_removed/' + name.replace("/", "_"))
         
         # get final loss
         loss.append(history.history['loss'][-1] * maxLatency)
@@ -113,8 +113,9 @@ def train_model():
             testY = test_sample["latency"] / maxLatency
 
             predY = model.predict(testX)
-            mae = np.mean(np.abs(testY.values - predY))
-            error.append(mae)
+            # mae = np.mean(np.abs(testY.values - predY))
+            rmse = np.sqrt(np.mean(np.square(testY.values - predY)))
+            error.append(rmse)
 
             # print("test sample ", i, " ", test.shape, test_sample.shape, testY.mean(), mae)
 
@@ -160,17 +161,18 @@ def train_model():
     results_file.close()
 
 
-def run_regression():
-    error = []
+def evaluate_models():
     for name, group in df:
 
         # if name == "ballerina/http/Caller#respond":
         #     continue
 
-        if (name not in test_apis):
-            continue
+        # if (name not in test_apis):
+        #     continue
 
         # print(group.latency.min())
+
+        group = datasets.remove_outliers(group)
 
         infile = open("../models/mae_outliers_removed/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "rb")
         scalerx = pkl.load(infile)
@@ -182,12 +184,8 @@ def run_regression():
 
         model = keras.models.load_model('../models/mae_outliers_removed/' + name.replace("/", "_"), compile=False)
 
-        # with open("scaler.pkl", "rb") as infile:
-        #     scaler = pkl.load(infile)
-        #     X_test_scaled = scalerx.transform(X_test)
-
         # preds for regression curve
-        x = np.arange(0, group.wip.max() +0.1 , 0.01)
+        x = np.arange(0, group.wip.max() + 0.1 , 0.01)
         preds = model.predict(scalerx.transform(x.reshape(-1, 1)))
         preds = preds * maxLatency
         test_preds_regression[name] = preds
@@ -203,6 +201,25 @@ def run_regression():
         pred_y = pred_y * maxLatency
         # error.append(np.mean(np.abs(test["latency"].values - pred_y)))
 
+         # evaluation using bucket method
+        error = []
+
+        for i in range(5):
+            test_sample = datasets.get_test_sample(test)
+            testX = scalerx.transform(test_sample["wip"].values.reshape(-1,1))
+            testY = test_sample["latency"] / maxLatency
+
+            predY = model.predict(testX)
+            mae = np.mean(np.abs(testY.values - predY))
+            # rmse = np.sqrt(np.mean(np.square(testY.values - predY)))
+            error.append(mae)
+
+            # print("test sample ", i, " ", test.shape, test_sample.shape, testY.mean(), mae)
+
+        avg_error = np.mean(error)
+        print("Loss: ", avg_error)
+        sample_loss.append(avg_error * maxLatency)
+
         # plt.yscale("log")
         plt.scatter(group.wip, group.latency, label='data')
         plt.scatter(test["wip"], pred_y, label='test data')
@@ -211,11 +228,16 @@ def run_regression():
         plt.xlabel('wip')
         plt.ylabel('latency')
         plt.legend()
-        plt.show()
-        # plt.savefig('../Plots/regression_test_plots_mae/' + name.replace("/", "_") + '_loss.png')
+        # plt.show()
+        # plt.savefig('../Plots/regression_test_plots_mae_outliers_removed/' + name.replace("/", "_") + '_loss.png')
         plt.close()
 
-    # print("\n".join([str(l) for l in error]), "\n\n")
+    mean_sample_loss = np.mean(sample_loss)
+    percentile_sample_loss = np.percentile(sample_loss, 95)
+
+    print("\n".join([str(l) for l in sample_loss]), "\n\n")
+    print("Mean sample_loss", mean_sample_loss)
+    print("95th percentile sample_loss", percentile_sample_loss)
 
 
 
@@ -223,5 +245,5 @@ def regression_forecast():
     return test_preds_regression
 
 
-train_model()
-# run_regression()
+# train_model()
+evaluate_models()

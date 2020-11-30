@@ -35,6 +35,8 @@ for name, group in df:
     # if (name not in high_loss_apis) and (name not in test_apis):
     #     continue
 
+    group = datasets.remove_outliers(group)
+
     X = group["wip"].values.reshape(group["wip"].shape[0],1)
     y = group["latency"]
 
@@ -54,7 +56,8 @@ for name, group in df:
     mae = np.mean(np.abs(y_test - preds))
     loss.append(mae)
 
-    preds = xg_reg.predict(np.arange(0, group.wip.max() + 0.1, 0.01).reshape(-1, 1))
+    x = np.arange(0, group.wip.max() + 0.1 , 0.01)
+    preds = xg_reg.predict(x.reshape(-1, 1))
     test_preds_xgb[name] = preds
 
     # print(name, preds)

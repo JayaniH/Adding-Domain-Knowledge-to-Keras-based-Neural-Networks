@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import datasets
 import regression
 import regression_xgboost
 import domain_model3
@@ -33,7 +34,7 @@ df = df[df['wip'] < 1500]
 df1 = df[df['api_name'].isin(high_loss_apis)]
 df2 = df[df['api_name'].isin(test_apis)]
 
-regression.run_regression()
+regression.evaluate_models()
 domain_model3.run()
 
 xgboost_test_preds = regression_xgboost.xgb_regression_forecast()
@@ -66,6 +67,8 @@ for name, group in df:
 
     # if (name not in high_loss_apis) and (name not in test_apis):
     #     continue
+
+    group = datasets.remove_outliers(group)
 
     results_file.write(name)
     results_file.write("\n")

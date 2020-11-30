@@ -46,7 +46,8 @@ def remove_outliers(df):
 
 def get_test_sample(df):
     n = int(max(df["wip"])) + 1
-    sample_size = int(len(df)/10) + 1        
+    sample_size = int(len(df)/10) + 1    
+    # sample_size = int(3678.610) + 1    
 
     window_size = n/10
 
@@ -94,10 +95,13 @@ def test():
     api = 'ballerina/http/Client#get#http://postman-echo.com'
     df = pd.read_csv('performance_data_truncated.csv', sep="\t")
     df = df[df.wip < 1500]
-    df = df[df["api_name"] == api]
+    # df = df[df["api_name"] == api]
+    # print(df["latency"].median())
+    # df = remove_outliers(df)
+    # print(df["latency"].mean())
 
-    df_filtered = remove_outliers(df)
-    print ("Filtered---", df.shape, df_filtered.shape)
+    # df_filtered = remove_outliers(df)
+    # print ("Filtered---", df.shape, df_filtered.shape)
 
     # plt.scatter(df["wip"], df["latency"], label='actual data')
     # plt.scatter(df_filtered["wip"], df_filtered["latency"], label='filtered data')
@@ -108,24 +112,25 @@ def test():
     # plt.show()
     # plt.close()
 
-    df_sampled = get_test_sample(df)
-    df_sampled = df_sampled.sort_values(by=['latency'])
-    print("Sampled---", df.shape, df_sampled.shape, df_sampled["latency"].min())
+    # df_sampled = get_test_sample(df)
+    # df_sampled = df_sampled.sort_values(by=['latency'])
+    # print("Sampled---", df.shape, df_sampled.shape, df_sampled["latency"].min())
 
-# test()
+    df = df.groupby(by="api_name")
+    new_df = pd.DataFrame()
+    for name, group in df:
+        group = remove_outliers(group)
+        new_df = new_df.append([group], ignore_index=True)
+        # data points
+        # print(group.api_name.count())
 
-################################
-# -----------for each API do the following-------
+        # latency
+        # print(group["latency"].max())
 
-# error = []
-# (train, test) = train_test_split(group, test_size=0.3, random_state=42)
+        # wip
+        # print(group["wip"].max())
 
-# for i in range(5):
-#     test_sample = get_test_sample(test)
-#     preds = model.predict(test["wip"])
-#     mae = np.mean(np.abs(preds - test["latency"]))
-#     error.append(mae)
+    print(new_df["latency"].median())
+    print(np.percentile(new_df["latency"], 95))
 
-# np.mean(error)
-
-#################################
+test()
