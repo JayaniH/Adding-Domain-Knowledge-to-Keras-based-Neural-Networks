@@ -65,21 +65,24 @@ def train_models():
 
         #scaling
 
-        scalerY = MinMaxScaler()
-        trainY = scalerY.fit_transform(train["residuals"].values.reshape(-1,1))
-        testY = scalerY.transform(test["residuals"].values.reshape(-1,1))
+        # scalerY = MinMaxScaler()
+        # trainY = scalerY.fit_transform(train["residuals"].values.reshape(-1,1))
+        # testY = scalerY.transform(test["residuals"].values.reshape(-1,1))
 
-        # save scaler Y
-        outfile = open("../models/residual_models_rmse/_scalars/scalerY" + name.replace("/", "_") + ".pkl", "wb")
-        pkl.dump(scalerY, outfile)
-        outfile.close()
+        # # save scaler Y
+        # outfile = open("../models/residual_models_rmse/_scalars/scalerY" + name.replace("/", "_") + ".pkl", "wb")
+        # pkl.dump(scalerY, outfile)
+        # outfile.close()
+
+        trainY = train["residuals"]
+        testY = test["residuals"]
 
         scalerX = MinMaxScaler()
         trainX = scalerX.fit_transform(train["wip"].values.reshape(-1,1))
         testX = scalerX.transform(test["wip"].values.reshape(-1,1))
 
         # save scaler X
-        outfile = open("../models/residual_models_rmse/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "wb")
+        outfile = open("../models/residual_models_rmse_without_y_scaling/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "wb")
         pkl.dump(scalerX, outfile)
         outfile.close()
 
@@ -91,17 +94,21 @@ def train_models():
         history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
         # save model
-        model.save('../models/residual_models_rmse/' + name.replace("/", "_"))
+        # model.save('../models/residual_models_rmse_without_y_scaling/' + name.replace("/", "_"))
 
         # get final loss for residual prediction
-        loss.append(scalerY.inverse_transform(np.array(history.history['loss'][-1]).reshape(-1,1))[0,0])
-        validation_loss.append(scalerY.inverse_transform(np.array(history.history['val_loss'][-1]).reshape(-1,1))[0,0])
+        # loss.append(scalerY.inverse_transform(np.array(history.history['loss'][-1]).reshape(-1,1))[0,0])
+        # validation_loss.append(scalerY.inverse_transform(np.array(history.history['val_loss'][-1]).reshape(-1,1))[0,0])
+
+        loss.append(history.history['loss'][-1])
+        validation_loss.append(history.history['val_loss'][-1])
 
         print("[INFO] predicting latency...")
         predY = model.predict(testX)
 
         # predY = d_latency  - (d_latency - latency)
-        pred_latency = test["domain_latency"] - scalerY.inverse_transform(predY).flatten()
+        # pred_latency = test["domain_latency"] - scalerY.inverse_transform(predY).flatten()
+        pred_latency = test["domain_latency"] - predY.flatten()
         rmse = np.sqrt(np.mean(np.square(test["latency"].values - pred_latency)))
         prediction_loss.append(rmse)
 
@@ -112,18 +119,20 @@ def train_models():
         for i in range(5):
             test_sample = datasets.get_test_sample(test)
             testX = scalerX.transform(test_sample["wip"].values.reshape(-1,1))
-            testY = scalerY.transform(test_sample["residuals"].values.reshape(-1,1))
+            # testY = scalerY.transform(test_sample["residuals"].values.reshape(-1,1))
+            testY = test_sample["residuals"]
 
             # predict residual (domain_latency - latency)
             predY = model.predict(testX)
 
             # residual error
             # mae = np.mean(np.abs(testY.values - predY))
-            rmse = np.sqrt(np.mean(np.square(testY - predY)))
+            rmse = np.sqrt(np.mean(np.square(testY.values - predY))) #remove .values for minmax scaler
             error.append(rmse)
 
             # prediction error (latency)
-            pred_latency = test_sample["domain_latency"] - scalerY.inverse_transform(predY).flatten()
+            # pred_latency = test_sample["domain_latency"] - scalerY.inverse_transform(predY).flatten()
+            pred_latency = test_sample["domain_latency"] - predY.flatten()
             rmse = np.sqrt(np.mean(np.square(test_sample["latency"].values - pred_latency)))
             pred_error.append(rmse)
 
@@ -131,11 +140,12 @@ def train_models():
 
         avg_error = np.mean(error)
         print("Residual sample_loss: ", avg_error)
-        sample_loss.append(scalerY.inverse_transform(np.array(avg_error).reshape(-1,1))[0,0])
+        # sample_loss.append(scalerY.inverse_transform(np.array(avg_error).reshape(-1,1))[0,0])
+        sample_loss.append(avg_error)
 
         avg_error = np.mean(pred_error)
         print("Pred sample_loss: ", avg_error)
-        sample_prediction_loss.append(scalerY.inverse_transform(np.array(avg_error).reshape(-1,1))[0,0])
+        sample_prediction_loss.append(avg_error)
 
         # record results
         # results_file.write(str(testY))
@@ -193,34 +203,37 @@ def evaluate_models():
         group["domain_latency"] = domain_model.predict(name, group["wip"])
         group["residuals"] = group["domain_latency"] - group["latency"]
 
-        infile = open("../models/residual_models_rmse/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../models/residual_models_rmse_without_y_scaling/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
         scalerX = pkl.load(infile)
         infile.close()
 
-        infile = open("../models/residual_models_rmse/_scalars/scalerY" + name.replace("/", "_") + ".pkl", "rb")
-        scalerY = pkl.load(infile)
-        infile.close()
+        # infile = open("../models/residual_models_rmse/_scalars/scalerY" + name.replace("/", "_") + ".pkl", "rb")
+        # scalerY = pkl.load(infile)
+        # infile.close()
 
         (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
-        model = keras.models.load_model('../models/residual_models_rmse/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../models/residual_models_rmse_without_y_scaling/' + name.replace("/", "_"), compile=False)
 
         # preds for regression curve
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
         domain_latency = domain_model.predict(name, x)
         preds = model.predict(scalerX.transform(x.reshape(-1, 1)))
-        preds = domain_latency - scalerY.inverse_transform(preds).flatten()
+        # preds = domain_latency - scalerY.inverse_transform(preds).flatten()
+        preds = domain_latency - preds.flatten()
         # test_preds_regression[name] = preds
 
         # print(name, preds)
 
         # preds for dataset
         testX = scalerX.transform(test["wip"].values.reshape(-1,1))
-        testY = scalerY.transform(test["residuals"].values.reshape(-1,1))
+        # testY = scalerY.transform(test["residuals"].values.reshape(-1,1))
+        testY = test["residuals"]
         predY = model.predict(testX)
 
         # predY = d_latency  - (d_latency - latency)
-        pred_latency = test["domain_latency"] - scalerY.inverse_transform(predY).flatten()
+        # pred_latency = test["domain_latency"] - scalerY.inverse_transform(predY).flatten()
+        pred_latency = test["domain_latency"] - predY.flatten()
         rmse = np.sqrt(np.mean(np.square(test["latency"].values - pred_latency)))
         prediction_loss.append(rmse)
 
@@ -232,7 +245,8 @@ def evaluate_models():
         for i in range(5):
             test_sample = datasets.get_test_sample(test)
             testX = scalerX.transform(test_sample["wip"].values.reshape(-1,1))
-            testY = scalerY.transform(test_sample["residuals"].values.reshape(-1,1))
+            # testY = scalerY.transform(test_sample["residuals"].values.reshape(-1,1))
+            testY = test_sample["residuals"]
 
             # predict residual (domain_latency - latency)
             predY = model.predict(testX)
@@ -243,7 +257,8 @@ def evaluate_models():
             error.append(rmse)
 
             # prediction error (latency)
-            pred_latency = test_sample["domain_latency"] - scalerY.inverse_transform(predY).flatten()
+            # pred_latency = test_sample["domain_latency"] - scalerY.inverse_transform(predY).flatten()
+            pred_latency = test_sample["domain_latency"] - predY.flatten()
             rmse = np.sqrt(np.mean(np.square(test_sample["latency"].values - pred_latency)))
             pred_error.append(rmse)
 
@@ -251,11 +266,12 @@ def evaluate_models():
 
         avg_error = np.mean(error)
         print("Residual sample_loss: ", avg_error)
-        sample_loss.append(scalerY.inverse_transform(np.array(avg_error).reshape(-1,1))[0,0])
+        # sample_loss.append(scalerY.inverse_transform(np.array(avg_error).reshape(-1,1))[0,0])
+        sample_loss.append(avg_error)
 
         avg_error = np.mean(pred_error)
         print("Pred sample_loss: ", avg_error)
-        sample_prediction_loss.append(scalerY.inverse_transform(np.array(avg_error).reshape(-1,1))[0,0])
+        sample_prediction_loss.append(avg_error)
 
 
         # plt.yscale("log")
