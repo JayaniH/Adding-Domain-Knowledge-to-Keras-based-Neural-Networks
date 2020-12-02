@@ -3,7 +3,7 @@ import pandas as pd
 import datasets
 import regression
 import regression_xgboost
-import domain_model3
+import domain_model3 as domain_model
 import residual_model
 import seaborn as sns
 import matplotlib.pyplot as plt 
@@ -29,22 +29,18 @@ test_apis = [
 ]
 
 
-df = pd.read_csv('performance_data_truncated.csv', sep="\t")
-df = df[df['wip'] < 1500]
+df = datasets.load_data()
 
-df1 = df[df['api_name'].isin(high_loss_apis)]
-df2 = df[df['api_name'].isin(test_apis)]
-
-regression.evaluate_models()
-domain_model3.run()
+# regression.evaluate_models()
+# domain_model.run()
 
 xgboost_test_preds = regression_xgboost.xgb_regression_forecast()
 
-regression_test_preds = regression.regression_forecast()
+regression_forecasts = regression.get_regression_forecasts()
 
-domain_test_preds = domain_model3.domain_forecast()
+domain_test_preds = domain_model.get_domain_forecasts()
 
-residual_model_forecasts = residual_model.evaluate_models()
+residual_model_forecasts = residual_model.get_residual_model_forecasts()
 
 # data_plot = pd.DataFrame({"api_name":high_loss_apis, "wip": df.wip, "latency": df.latency, "xgboost": xgboost_preds, "domain": domain_preds, "wip_all": np.arange(0, 1500)})
 # g = sns.FacetGrid(data_plot, col="api_name", col_wrap=5)
@@ -58,12 +54,8 @@ residual_model_forecasts = residual_model.evaluate_models()
 # print("xgboost:" ,xgboost_preds)
 # print("regression: ", regression_preds)
 
-df1 = df1.groupby(by="api_name")
-df2 = df2.groupby(by="api_name")
-
 results_file = open("./results/predictions.txt", "w")
 
-df = df.groupby(by="api_name")
 i = 0
 
 for name, group in df:
@@ -73,16 +65,11 @@ for name, group in df:
 
     group = datasets.remove_outliers(group)
 
-    results_file.write(name)
-    results_file.write("\n")
-    results_file.write(str(regression_test_preds[name]))
-    results_file.write("\n")
-
     x = np.arange(0, group.wip.max() + 0.1 , 0.01)
 
     # plt.yscale("log")
     plt.scatter(group.wip, group.latency)
-    plt.plot(x, regression_test_preds[name], 'r', label='regression')
+    plt.plot(x, regression_forecasts[name], 'r', label='regression')
     plt.plot(x, xgboost_test_preds[name], 'm', label='xgboost')
     plt.plot(x, domain_test_preds[name], 'y', label='domain')
     plt.plot(x, residual_model_forecasts[name], 'g', label='hybrid(residual model)')
@@ -92,8 +79,8 @@ for name, group in df:
     plt.ylim(ymin=0)
     plt.legend()
     # plt.figtext(0.5, 0, "regression val_loss: " + str(val_loss[i]), fontsize=11)
-    # plt.show()
-    plt.savefig('../Plots/forecasts_new/' + name.replace("/", "_") + '.png')
+    plt.show()
+    # plt.savefig('../Plots/forecasts_new/' + name.replace("/", "_") + '.png')
     plt.close()
     i=i+1
 

@@ -32,6 +32,7 @@ test_apis = [
     'ballerinax/sfdc/QueryClient#getQueryResult',
     'ballerinax/sfdc/SObjectClient#createOpportunity'
 ]
+residual_models_predictions = {}
 
 # results_file = open("./results/residual_results.txt", "w")
 
@@ -39,8 +40,8 @@ test_apis = [
 print("[INFO] loading data...")
 df = datasets.load_data()
 
-# run domain model
-domain_model.run()
+# fit domain model parameters
+domain_model_parameters = domain_model.fit_parameters_and_evaluate()
 
 def train_models():
 
@@ -55,7 +56,7 @@ def train_models():
         # results_file.write(name)
         # results_file.write("\n")
         
-        group["domain_latency"] = domain_model.predict(name, group["wip"])
+        group["domain_latency"] = domain_model.predict(name, group["wip"], domain_model_parameters[name])
         group["residuals"] = group["domain_latency"] - group["latency"]
 
         print("[INFO] constructing training/testing split...")
@@ -88,13 +89,13 @@ def train_models():
 
         model = models.create_residual_model(trainX.shape[1])
         opt = Adam(learning_rate=1e-2, decay=1e-3/200)
-        model.compile(loss=root_mean_squared_error, optimizer=opt)
+        model.compile(loss="mean_absolute_error", optimizer=opt)
 
         print("[INFO] training model...")
         history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
         # save model
-        # model.save('../models/residual_models_rmse_without_y_scaling/' + name.replace("/", "_"))
+        model.save('../models/residual_models_rmse_without_y_scaling/' + name.replace("/", "_"))
 
         # get final loss for residual prediction
         # loss.append(scalerY.inverse_transform(np.array(history.history['loss'][-1]).reshape(-1,1))[0,0])
@@ -106,10 +107,13 @@ def train_models():
         print("[INFO] predicting latency...")
         predY = model.predict(testX)
 
-        # predY = d_latency  - (d_latency - latency)
+        # predY = residuals = domain_latency - latency
+        # pred_latency = domain_latency  - (domain_latency - latency)
+
         # pred_latency = test["domain_latency"] - scalerY.inverse_transform(predY).flatten()
         pred_latency = test["domain_latency"] - predY.flatten()
         rmse = np.sqrt(np.mean(np.square(test["latency"].values - pred_latency)))
+        # mae = np.mean(np.abs(test["latency"].values - pred_latency))
         prediction_loss.append(rmse)
 
         # evaluation using bucket method
@@ -128,12 +132,14 @@ def train_models():
             # residual error
             # mae = np.mean(np.abs(testY.values - predY))
             rmse = np.sqrt(np.mean(np.square(testY.values - predY))) #remove .values for minmax scaler
+            # mae = np.mean(np.abs(testY.values - predY))
             error.append(rmse)
 
             # prediction error (latency)
             # pred_latency = test_sample["domain_latency"] - scalerY.inverse_transform(predY).flatten()
             pred_latency = test_sample["domain_latency"] - predY.flatten()
             rmse = np.sqrt(np.mean(np.square(test_sample["latency"].values - pred_latency)))
+            # mae = np.mean(np.abs(test_sample["latency"].values - pred_latency))
             pred_error.append(rmse)
 
             # print("test sample ", i, " ", test.shape, test_sample.shape, testY.mean(), mae)
@@ -195,12 +201,12 @@ def evaluate_models():
         # if name == "ballerina/http/Caller#respond":
         #     continue
 
-        if (name not in test_apis):
-            continue
+        # if (name not in test_apis):
+        #     continue
 
         group = datasets.remove_outliers(group)
 
-        group["domain_latency"] = domain_model.predict(name, group["wip"])
+        group["domain_latency"] = domain_model.predict(name, group["wip"], domain_model_parameters[name])
         group["residuals"] = group["domain_latency"] - group["latency"]
 
         infile = open("../models/residual_models_rmse_without_y_scaling/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
@@ -217,11 +223,10 @@ def evaluate_models():
 
         # preds for regression curve
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
-        domain_latency = domain_model.predict(name, x)
+        domain_latency = domain_model.predict(name, x, domain_model_parameters[name])
         preds = model.predict(scalerX.transform(x.reshape(-1, 1)))
         # preds = domain_latency - scalerY.inverse_transform(preds).flatten()
         preds = domain_latency - preds.flatten()
-        # test_preds_regression[name] = preds
 
         # print(name, preds)
 
@@ -235,6 +240,7 @@ def evaluate_models():
         # pred_latency = test["domain_latency"] - scalerY.inverse_transform(predY).flatten()
         pred_latency = test["domain_latency"] - predY.flatten()
         rmse = np.sqrt(np.mean(np.square(test["latency"].values - pred_latency)))
+        # mae = np.mean(np.abs(test["latency"].values - pred_latency))
         prediction_loss.append(rmse)
 
 
@@ -252,14 +258,15 @@ def evaluate_models():
             predY = model.predict(testX)
 
             # residual error
+            rmse = np.sqrt(np.mean(np.square(testY.values - predY)))
             # mae = np.mean(np.abs(testY.values - predY))
-            rmse = np.sqrt(np.mean(np.square(testY - predY)))
             error.append(rmse)
 
             # prediction error (latency)
             # pred_latency = test_sample["domain_latency"] - scalerY.inverse_transform(predY).flatten()
             pred_latency = test_sample["domain_latency"] - predY.flatten()
             rmse = np.sqrt(np.mean(np.square(test_sample["latency"].values - pred_latency)))
+            # mae = np.mean(np.abs(test_sample["latency"].values - pred_latency))
             pred_error.append(rmse)
 
             # print("test sample ", i, " ", test.shape, test_sample.shape, testY.mean(), mae)
@@ -283,7 +290,7 @@ def evaluate_models():
         plt.ylabel('latency')
         plt.legend()
         # plt.show()
-        # plt.savefig('../Plots/regression_test_plots_mae_outliers_removed/' + name.replace("/", "_") + '_loss.png')
+        # plt.savefig('../Plots/residual_models_rmse_without_y_scaling/' + name.replace("/", "_") + '_loss.png')
         plt.close()
 
     mean_prediction_loss = np.mean(prediction_loss)
@@ -306,5 +313,34 @@ def evaluate_models():
     print("Median prediction_loss/sample_loss/sample_prediction_loss", median_prediction_loss, median_sample_loss, median_sample_prediction_loss)
     print("95th percentile prediction_loss/sample_loss/sample_prediction_loss", percentile_prediction_loss, percentile_sample_loss, percentile_sample_prediction_loss)
 
-train_models()
-# evaluate_models()
+    return residual_models_predictions
+
+
+def get_residual_model_forecasts():
+
+    for name, group in df:
+
+        group = datasets.remove_outliers(group)
+
+        group["domain_latency"] = domain_model.predict(name, group["wip"], domain_model_parameters[name])
+        group["residuals"] = group["domain_latency"] - group["latency"]
+
+        infile = open("../models/residual_models_rmse_without_y_scaling/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
+        scalerX = pkl.load(infile)
+        infile.close()
+
+        model = keras.models.load_model('../models/residual_models_rmse_without_y_scaling/' + name.replace("/", "_"), compile=False)
+
+        x = np.arange(0, group.wip.max() + 0.1 , 0.01)
+        domain_latency = domain_model.predict(name, x, domain_model_parameters[name])
+        preds = model.predict(scalerX.transform(x.reshape(-1, 1)))
+        # preds = domain_latency - scalerY.inverse_transform(preds).flatten()
+        preds = domain_latency - preds.flatten()
+        residual_models_predictions[name] = preds
+
+        # print(name, preds)
+
+    return residual_models_predictions
+
+# train_models()
+evaluate_models()

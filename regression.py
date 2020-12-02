@@ -41,7 +41,7 @@ test_apis = [
     'ballerinax/sfdc/QueryClient#getQueryResult',
     'ballerinax/sfdc/SObjectClient#createOpportunity'
 ]
-test_preds_regression = {}
+regression_predictions = {}
 
 # load data
 print("[INFO] loading data...")
@@ -188,7 +188,6 @@ def evaluate_models():
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
         preds = model.predict(scalerx.transform(x.reshape(-1, 1)))
         preds = preds * maxLatency
-        test_preds_regression[name] = preds
 
         # print(name, preds)
 
@@ -255,9 +254,26 @@ def evaluate_models():
 
 
 
-def regression_forecast():
-    return test_preds_regression
+def get_regression_forecasts():
+    for name, group in df:
 
+        group = datasets.remove_outliers(group)
+        maxLatency = group["latency"].max()
+
+        infile = open("../models/rmse_outliers_removed/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "rb")
+        scalerx = pkl.load(infile)
+        infile.close()
+
+        model = keras.models.load_model('../models/rmse_outliers_removed/' + name.replace("/", "_"), compile=False)
+
+        # preds for regression curve
+        x = np.arange(0, group.wip.max() + 0.1 , 0.01)
+        preds = model.predict(scalerx.transform(x.reshape(-1, 1)))
+        preds = preds * maxLatency
+        regression_predictions[name] = preds
+
+        # print(name, preds)
+    return regression_predictions
 
 # train_model()
 # evaluate_models()

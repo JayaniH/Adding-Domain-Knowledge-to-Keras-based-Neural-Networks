@@ -7,25 +7,23 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 import datasets
 
-test_preds_domain ={}
-parameters = {}
 
 # USL equation
 def USL(n, s, k, l):
 	return (1 + s*(n-1) + k*n*(n-1))/l
 
+print("[INFO] loading data...")
+df = datasets.load_data()
 
-def run():
+def fit_parameters_and_evaluate():
 
+    parameters = {}
     sample_loss = []
     loss = []
     equation_params = []
     EPSILON =  1e-6
 
     # results_file = open("./results/domain_results.txt", "w")
-
-    print("[INFO] loading data...")
-    df = datasets.load_data()
 
     for name, group in df:
 
@@ -93,7 +91,7 @@ def run():
 
         x = np.arange(0, group.wip.max() +0.1 , 0.01)
         y = USL(x, s, k, l)
-        test_preds_domain[name] = y
+        # domain_model_predictions[name] = y
 
         # plt.yscale("log")
         plt.scatter(group.wip, group.latency)
@@ -127,15 +125,28 @@ def run():
     # results_file.write("\nMean loss %s" % (mean_loss)) 
     # results_file.write("\n95th percentile loss %s" % (percentile_loss)) 
 
-def domain_forecast():
-    return test_preds_domain
+    return parameters
 
-def predict(api,wip):
-    print("[INFO] predicting d_latency...")
+def predict(api, wip, parameters):
+    print("[INFO] predicting domain latency for " + api)
 
-    [s, k, l] = parameters[api]
+    # [s, k, l] = parameters[api]
+    [s, k, l] = parameters
     d_latency = USL(wip, s, k, l)
 
     return d_latency
 
-# run()
+
+def get_domain_forecasts():
+
+    domain_model_predictions ={}
+
+    parameters = fit_parameters_and_evaluate()
+    for name, group in df:
+        x = np.arange(0, group.wip.max() +0.1 , 0.01)
+        y = predict(name, x, parameters[name])
+        domain_model_predictions[name] = y
+
+    return domain_model_predictions
+
+# fit_parameters_and_evaluate()
