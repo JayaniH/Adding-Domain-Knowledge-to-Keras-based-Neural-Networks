@@ -174,7 +174,7 @@ def evaluate_models():
 
         group = datasets.remove_outliers(group)
 
-        infile = open("../models/mae_outliers_removed/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../models/rmse_outliers_removed/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "rb")
         scalerx = pkl.load(infile)
         infile.close()
 
@@ -182,7 +182,7 @@ def evaluate_models():
 
         maxLatency = train["latency"].max()
 
-        model = keras.models.load_model('../models/mae_outliers_removed/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../models/rmse_outliers_removed/' + name.replace("/", "_"), compile=False)
 
         # preds for regression curve
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
@@ -201,7 +201,16 @@ def evaluate_models():
         pred_y = pred_y * maxLatency
         # error.append(np.mean(np.abs(test["latency"].values - pred_y)))
 
-         # evaluation using bucket method
+        # evaluation with entire test set
+        testX = scalerx.transform(test["wip"].values.reshape(-1,1))
+        testY = test["latency"] / maxLatency
+
+        predY = model.predict(testX)
+        # mae = np.mean(np.abs(testY.values - predY))
+        rmse = np.sqrt(np.mean(np.square(testY.values - predY)))
+        validation_loss.append(rmse * maxLatency)
+        
+        # evaluation using bucket method
         error = []
 
         for i in range(5):
@@ -210,14 +219,14 @@ def evaluate_models():
             testY = test_sample["latency"] / maxLatency
 
             predY = model.predict(testX)
-            mae = np.mean(np.abs(testY.values - predY))
-            # rmse = np.sqrt(np.mean(np.square(testY.values - predY)))
-            error.append(mae)
+            # mae = np.mean(np.abs(testY.values - predY))
+            rmse = np.sqrt(np.mean(np.square(testY.values - predY)))
+            error.append(rmse)
 
             # print("test sample ", i, " ", test.shape, test_sample.shape, testY.mean(), mae)
 
         avg_error = np.mean(error)
-        print("Loss: ", avg_error)
+        print("Sample Loss: ", avg_error)
         sample_loss.append(avg_error * maxLatency)
 
         # plt.yscale("log")
@@ -232,12 +241,17 @@ def evaluate_models():
         # plt.savefig('../Plots/regression_test_plots_mae_outliers_removed/' + name.replace("/", "_") + '_loss.png')
         plt.close()
 
+    mean_val_loss = np.mean(validation_loss)
     mean_sample_loss = np.mean(sample_loss)
+
+    percentile_val_loss = np.percentile(validation_loss, 95)
     percentile_sample_loss = np.percentile(sample_loss, 95)
 
+    print("\n".join([str(l) for l in validation_loss]), "\n\n")
     print("\n".join([str(l) for l in sample_loss]), "\n\n")
-    print("Mean sample_loss", mean_sample_loss)
-    print("95th percentile sample_loss", percentile_sample_loss)
+
+    print("Mean val_loss/sample_loss", mean_val_loss, mean_sample_loss)
+    print("95th percentile val_loss/sample_loss", percentile_val_loss, percentile_sample_loss)
 
 
 
@@ -246,4 +260,4 @@ def regression_forecast():
 
 
 # train_model()
-evaluate_models()
+# evaluate_models()

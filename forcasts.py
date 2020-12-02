@@ -4,6 +4,7 @@ import datasets
 import regression
 import regression_xgboost
 import domain_model3
+import residual_model
 import seaborn as sns
 import matplotlib.pyplot as plt 
 
@@ -42,6 +43,8 @@ xgboost_test_preds = regression_xgboost.xgb_regression_forecast()
 regression_test_preds = regression.regression_forecast()
 
 domain_test_preds = domain_model3.domain_forecast()
+
+residual_model_forecasts = residual_model.evaluate_models()
 
 # data_plot = pd.DataFrame({"api_name":high_loss_apis, "wip": df.wip, "latency": df.latency, "xgboost": xgboost_preds, "domain": domain_preds, "wip_all": np.arange(0, 1500)})
 # g = sns.FacetGrid(data_plot, col="api_name", col_wrap=5)
@@ -82,6 +85,7 @@ for name, group in df:
     plt.plot(x, regression_test_preds[name], 'r', label='regression')
     plt.plot(x, xgboost_test_preds[name], 'm', label='xgboost')
     plt.plot(x, domain_test_preds[name], 'y', label='domain')
+    plt.plot(x, residual_model_forecasts[name], 'g', label='hybrid(residual model)')
     plt.title(name)
     plt.xlabel('wip')
     plt.ylabel('latency')

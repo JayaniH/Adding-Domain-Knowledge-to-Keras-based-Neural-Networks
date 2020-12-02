@@ -133,4 +133,4 @@ def test():
     print(new_df["latency"].median())
     print(np.percentile(new_df["latency"], 95))
 
-test()
+# test()
