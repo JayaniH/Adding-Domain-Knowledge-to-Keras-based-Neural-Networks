@@ -149,4 +149,4 @@ def get_domain_forecasts():
 
     return domain_model_predictions
 
-# fit_parameters_and_evaluate()
+fit_parameters_and_evaluate()

@@ -83,7 +83,7 @@ def train_models():
         testX = scalerX.transform(test["wip"].values.reshape(-1,1))
 
         # save scaler X
-        outfile = open("../models/residual_models_rmse_without_y_scaling/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "wb")
+        outfile = open("../models/10_residual_rmse/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "wb")
         pkl.dump(scalerX, outfile)
         outfile.close()
 
@@ -95,7 +95,7 @@ def train_models():
         history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
         # save model
-        model.save('../models/residual_models_rmse_without_y_scaling/' + name.replace("/", "_"))
+        model.save('../models/10_residual_rmse/' + name.replace("/", "_"))
 
         # get final loss for residual prediction
         # loss.append(scalerY.inverse_transform(np.array(history.history['loss'][-1]).reshape(-1,1))[0,0])
@@ -209,7 +209,7 @@ def evaluate_models():
         group["domain_latency"] = domain_model.predict(name, group["wip"], domain_model_parameters[name])
         group["residuals"] = group["domain_latency"] - group["latency"]
 
-        infile = open("../models/residual_models_rmse_without_y_scaling/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../models/10_residual_rmse/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
         scalerX = pkl.load(infile)
         infile.close()
 
@@ -219,7 +219,7 @@ def evaluate_models():
 
         (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
-        model = keras.models.load_model('../models/residual_models_rmse_without_y_scaling/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../models/10_residual_rmse/' + name.replace("/", "_"), compile=False)
 
         # preds for regression curve
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
@@ -282,15 +282,17 @@ def evaluate_models():
 
 
         # plt.yscale("log")
-        plt.scatter(group.wip, group.latency, label='data')
+        plt.scatter(group["wip"], group["latency"], label='data')
+        plt.scatter(group["wip"], group["residuals"], label='data')
         # plt.scatter(test["wip"], pred_y, label='test data')
-        plt.plot(x, preds, 'r', label='residual line')
+        # plt.plot(x, preds, 'r', label='residual line')
+        plt.plot(x, domain_latency, 'r', label='domain')
         plt.title(name)
         plt.xlabel('wip')
         plt.ylabel('latency')
         plt.legend()
         # plt.show()
-        # plt.savefig('../Plots/residual_models_rmse_without_y_scaling/' + name.replace("/", "_") + '_loss.png')
+        plt.savefig('../Plots/residual_actual_domain/' + name.replace("/", "_") + '_loss.png')
         plt.close()
 
     mean_prediction_loss = np.mean(prediction_loss)
@@ -325,11 +327,11 @@ def get_residual_model_forecasts():
         group["domain_latency"] = domain_model.predict(name, group["wip"], domain_model_parameters[name])
         group["residuals"] = group["domain_latency"] - group["latency"]
 
-        infile = open("../models/residual_models_rmse_without_y_scaling/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../models/10_residual_rmse/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
         scalerX = pkl.load(infile)
         infile.close()
 
-        model = keras.models.load_model('../models/residual_models_rmse_without_y_scaling/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../models/10_residual_rmse/' + name.replace("/", "_"), compile=False)
 
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
         domain_latency = domain_model.predict(name, x, domain_model_parameters[name])
