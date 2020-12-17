@@ -143,9 +143,11 @@ def get_domain_forecasts():
 
     parameters = fit_parameters_and_evaluate()
     for name, group in df:
+        group = datasets.remove_outliers(group)
         x = np.arange(0, group.wip.max() +0.1 , 0.01)
         y = predict(name, x, parameters[name])
         domain_model_predictions[name] = y
+        # print(x.shape, y.shape)
 
     return domain_model_predictions
 

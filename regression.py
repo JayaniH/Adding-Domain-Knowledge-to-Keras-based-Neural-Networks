@@ -283,5 +283,5 @@ def get_regression_forecasts():
         # print(name, preds)
     return regression_predictions
 
-train_models()
+# train_models()
 # evaluate_models()
