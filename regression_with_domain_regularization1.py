@@ -1,5 +1,5 @@
+
 import matplotlib.pyplot as plt 
-import tensorflow as tf
 from tensorflow import keras
 from keras import backend as K
 from tensorflow.keras.optimizers import Adam
@@ -11,15 +11,19 @@ import domain_model3 as domain_model
 import numpy as np
 import pickle as pkl
 
-def custom_loss(y_true, y):
-    y_pred = y[:,0]
+def custom_loss(y, y_pred):
+    y_true = y[:,0]
     domain_latency = y[:,1]
-    
-    # print("custom loss", y_true, y, y_pred, domain_latency)
+
+    # print("custom loss")
     # y_true=K.print_tensor(y_true)
     # domain_latency=K.print_tensor(domain_latency)
 
-    return K.sqrt(K.mean(K.square(y_pred - y_true))) +  (0.2 * K.sqrt(K.mean(K.square(domain_latency - y_pred))))
+    loss = K.sqrt(K.mean(K.square(y_pred - y_true)))
+
+    return loss if loss <= 500 else (loss + 0.2 * K.sqrt(K.mean(K.square(domain_latency - y_pred))))
+
+    # return K.sqrt(K.mean(K.square(y_pred - y_true))) +  0.1 * K.sqrt(K.mean(K.square(domain_latency - y_pred)))
 
 loss = []
 validation_loss = []
@@ -35,7 +39,7 @@ test_apis = [
     'ballerinax/sfdc/QueryClient#getQueryResult',
     'ballerinax/sfdc/SObjectClient#createOpportunity'
 ]
-regression_with_domain_regularization_predictions = {}
+residual_models_predictions = {}
 
 # load data
 print("[INFO] loading data...")
@@ -51,12 +55,12 @@ def train_models():
         # if name == "ballerina/http/Caller#respond":
         #     continue
 
-        if name not in test_apis:
-            continue
+        # if name not in test_apis:
+        #     continue
 
         group = datasets.remove_outliers(group)
         print(name, "\n")
-        
+
         group["domain_latency"] = domain_model.predict(name, group["wip"], domain_model_parameters[name])
 
         print("[INFO] constructing training/testing split...")
@@ -65,23 +69,20 @@ def train_models():
         print("[INFO] processing data...")
 
         #scaling
-        trainY = train["latency"]
-        testY = test["latency"]
-        # print(trainY["domain_latency"])
+        trainY = train[["latency", "domain_latency"]]
+        testY = test[["latency", "domain_latency"]]
+        # print(trainY["latency"], trainY)
 
         scalerX = MinMaxScaler()
         trainX = scalerX.fit_transform(train["wip"].values.reshape(-1,1))
-        trainX = np.concatenate((trainX, train["domain_latency"].values.reshape(-1,1)), axis=1)
         testX = scalerX.transform(test["wip"].values.reshape(-1,1))
-        testX = np.concatenate((testX, test["domain_latency"].values.reshape(-1,1)), axis=1)
-        # print(trainX.shape, testX.shape)
 
         # save scaler X
-        outfile = open("../models/26_regression_with_custom_loss_rmse_2_clipping/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "wb")
+        outfile = open("../models/29_regression_with_custom_loss_rmse_2_clipping_3000/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "wb")
         pkl.dump(scalerX, outfile)
         outfile.close()
 
-        model = models.create_regularization_model(trainX.shape[1])
+        model = models.create_model(trainX.shape[1])
         opt = Adam(learning_rate=1e-2, decay=1e-3/200)
         model.compile(loss=custom_loss, optimizer=opt)
 
@@ -89,15 +90,14 @@ def train_models():
         history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
         # save model
-        model.save('../models/26_regression_with_custom_loss_rmse_2_clipping/' + name.replace("/", "_"))
+        model.save('../models/29_regression_with_custom_loss_rmse_2_clipping_3000/' + name.replace("/", "_"))
 
         loss.append(history.history['loss'][-1])
         validation_loss.append(history.history['val_loss'][-1])
 
         print("[INFO] predicting latency...")
-        preds = model.predict(testX)
-        pred_latency = preds[:,0]
-        # print(preds[:,1], test["domain_latency"])
+        pred_latency = model.predict(testX)
+        # print(pred_latency)
 
         rmse = np.sqrt(np.mean(np.square(test["latency"].values - pred_latency)))
         # mae = np.mean(np.abs(test["latency"].values - pred_latency))
@@ -110,11 +110,9 @@ def train_models():
             test_sample = datasets.get_test_sample(test)
             testX = scalerX.transform(test_sample["wip"].values.reshape(-1,1))
             # testY = scalerY.transform(test_sample["residuals"].values.reshape(-1,1))
-            testX = np.concatenate((testX, test_sample["domain_latency"].values.reshape(-1,1)), axis=1)
-            testY = test_sample["latency"]
+            testY = test_sample[["latency", "domain_latency"]]
 
-            preds = model.predict(testX)
-            pred_latency = preds[:,0]
+            pred_latency = model.predict(testX)
 
             # prediction error (latency)
             rmse = np.sqrt(np.mean(np.square(test_sample["latency"].values - pred_latency)))
@@ -156,8 +154,8 @@ def train_models():
 def evaluate_models():
     for name, group in df:
 
-        # if name == "ballerina/http/Caller#respond":
-        #     continue
+        if name == "ballerina/http/Caller#respond":
+            continue
 
         # if (name not in test_apis):
         #     continue
@@ -166,28 +164,27 @@ def evaluate_models():
 
         group["domain_latency"] = domain_model.predict(name, group["wip"], domain_model_parameters[name])
 
-        infile = open("../models/24_regression_with_custom_loss_rmse_2_relu/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../models/13_regression_with_custom_loss/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
         scalerX = pkl.load(infile)
         infile.close()
 
+        # infile = open("../models/residual_models_rmse/_scalars/scalerY" + name.replace("/", "_") + ".pkl", "rb")
+        # scalerY = pkl.load(infile)
+        # infile.close()
+
         (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
-        model = keras.models.load_model('../models/24_regression_with_custom_loss_rmse_2_relu/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../models/13_regression_with_custom_loss/' + name.replace("/", "_"), compile=False)
 
         # preds for regression curve
         x = np.arange(0, group["wip"].max() + 0.1 , 0.01)
-        domain_latency = domain_model.predict(name, x, domain_model_parameters[name])
-        xWIP = np.concatenate((scalerX.transform(x.reshape(-1, 1)), domain_latency.reshape(-1,1)), axis=1)
-        preds = model.predict(xWIP)
-        xPreds = preds[:,0]
-        # print(x.shape, xPreds.shape)
+        preds = model.predict(scalerX.transform(x.reshape(-1, 1)))
 
         # print(name, preds)
 
         # preds for dataset
         testX = scalerX.transform(test["wip"].values.reshape(-1,1))
-        testX = np.concatenate((testX, test["domain_latency"].values.reshape(-1,1)), axis=1)
-        predY = model.predict(testX)[:,0]
+        predY = model.predict(testX)
 
         rmse = np.sqrt(np.mean(np.square(test["latency"].values - predY)))
         # mae = np.mean(np.abs(test["latency"].values - pred_latency))
@@ -200,9 +197,9 @@ def evaluate_models():
         for i in range(5):
             test_sample = datasets.get_test_sample(test)
             testX = scalerX.transform(test_sample["wip"].values.reshape(-1,1))
-            testX = np.concatenate((testX, test_sample["domain_latency"].values.reshape(-1,1)), axis=1)
+
             # predict residual (domain_latency - latency)
-            pred_latency = model.predict(testX)[:,0]
+            pred_latency = model.predict(testX)
 
             # prediction error (latency)
             rmse = np.sqrt(np.mean(np.square(test_sample["latency"].values - pred_latency)))
@@ -220,12 +217,12 @@ def evaluate_models():
         plt.scatter(group["wip"], group["latency"], label='data')
         plt.scatter(test["wip"], predY, label='test data - predictions')
         plt.scatter(test["wip"], test["latency"], label='test data - actual')
-        plt.plot(x, xPreds, label='regression')
+        plt.plot(x, preds, 'r', label='regression')
         plt.title(name)
         plt.xlabel('wip')
         plt.ylabel('latency')
         plt.legend()
-        # plt.show()
+        plt.show()
         # plt.savefig('../Plots/residual_actual_domain/' + name.replace("/", "_") + '_loss.png')
         plt.close()
 
@@ -246,32 +243,5 @@ def evaluate_models():
     print("95th percentile prediction_loss/sample_prediction_loss", percentile_prediction_loss, percentile_sample_prediction_loss)
 
 
-def get_regression_with_domain_regularization_forecasts():
-
-    for name, group in df:
-
-        group = datasets.remove_outliers(group)
-
-        group["domain_latency"] = domain_model.predict(name, group["wip"], domain_model_parameters[name])
-
-        infile = open("../models/24_regression_with_custom_loss_rmse_2_relu/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
-        scalerX = pkl.load(infile)
-        infile.close()
-
-        (train, test) = train_test_split(group, test_size=0.3, random_state=42)
-
-        model = keras.models.load_model('../models/24_regression_with_custom_loss_rmse_2_relu/' + name.replace("/", "_"), compile=False)
-
-        # preds for regression curve
-        x = np.arange(0, group["wip"].max() + 0.1 , 0.01)
-        domain_latency = domain_model.predict(name, x, domain_model_parameters[name])
-        xWIP = np.concatenate((scalerX.transform(x.reshape(-1, 1)), domain_latency.reshape(-1,1)), axis=1)
-        preds = model.predict(xWIP)
-        xPreds = preds[:,0]
-        regression_with_domain_regularization_predictions[name] = xPreds
-
-    return regression_with_domain_regularization_predictions
-
-
 train_models()
-# evaluate_models()
+# evaluate_models() 
