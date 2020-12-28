@@ -1,4 +1,3 @@
-
 import matplotlib.pyplot as plt 
 from tensorflow import keras
 from keras import backend as K
@@ -7,23 +6,27 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 import datasets
 import models
+import losses
 import domain_model3 as domain_model
 import numpy as np
 import pickle as pkl
 
-def custom_loss(y, y_pred):
-    y_true = y[:,0]
-    domain_latency = y[:,1]
+def custom_loss(threshold):
 
-    # print("custom loss")
-    # y_true=K.print_tensor(y_true)
-    # domain_latency=K.print_tensor(domain_latency)
+    def loss(y, y_pred):
+        y_true = y[:,0]
+        domain_latency = y[:,1]
+        # threshold = 0.5 * K.mean(y_true)
 
-    loss = K.sqrt(K.mean(K.square(y_pred - y_true)))
+        # y_true=K.print_tensor(y_true)
 
-    return loss if loss <= 500 else (loss + 0.2 * K.sqrt(K.mean(K.square(domain_latency - y_pred))))
+        loss = K.sqrt(K.mean(K.square(y_pred - y_true)))
 
-    # return K.sqrt(K.mean(K.square(y_pred - y_true))) +  0.1 * K.sqrt(K.mean(K.square(domain_latency - y_pred)))
+        return loss if loss <= threshold else (loss + 0.2 * K.sqrt(K.mean(K.square(domain_latency - y_pred))))
+
+        # return K.sqrt(K.mean(K.square(y_pred - y_true))) +  0.1 * K.sqrt(K.mean(K.square(domain_latency - y_pred)))
+
+    return loss
 
 loss = []
 validation_loss = []
@@ -73,24 +76,26 @@ def train_models():
         testY = test[["latency", "domain_latency"]]
         # print(trainY["latency"], trainY)
 
+        clipping_threshold = 0.2 * np.mean(trainY["latency"])
+
         scalerX = MinMaxScaler()
         trainX = scalerX.fit_transform(train["wip"].values.reshape(-1,1))
         testX = scalerX.transform(test["wip"].values.reshape(-1,1))
 
         # save scaler X
-        outfile = open("../models/29_regression_with_custom_loss_rmse_2_clipping_3000/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "wb")
+        outfile = open("../models/34_regression_with_custom_loss_rmse_2_clipping_dynamic_threshold_mean_2/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "wb")
         pkl.dump(scalerX, outfile)
         outfile.close()
 
         model = models.create_model(trainX.shape[1])
         opt = Adam(learning_rate=1e-2, decay=1e-3/200)
-        model.compile(loss=custom_loss, optimizer=opt)
+        model.compile(loss=losses.custom_loss_dynamic_threshold(clipping_threshold), optimizer=opt)
 
         print("[INFO] training model...")
         history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
         # save model
-        model.save('../models/29_regression_with_custom_loss_rmse_2_clipping_3000/' + name.replace("/", "_"))
+        model.save('../models/34_regression_with_custom_loss_rmse_2_clipping_dynamic_threshold_mean_2/' + name.replace("/", "_"))
 
         loss.append(history.history['loss'][-1])
         validation_loss.append(history.history['val_loss'][-1])
@@ -154,8 +159,8 @@ def train_models():
 def evaluate_models():
     for name, group in df:
 
-        if name == "ballerina/http/Caller#respond":
-            continue
+        # if name == "ballerina/http/Caller#respond":
+        #     continue
 
         # if (name not in test_apis):
         #     continue
@@ -164,7 +169,7 @@ def evaluate_models():
 
         group["domain_latency"] = domain_model.predict(name, group["wip"], domain_model_parameters[name])
 
-        infile = open("../models/13_regression_with_custom_loss/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../models/30_regression_with_custom_loss_rmse_2_clipping_dynamic_threshold/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
         scalerX = pkl.load(infile)
         infile.close()
 
@@ -174,7 +179,7 @@ def evaluate_models():
 
         (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
-        model = keras.models.load_model('../models/13_regression_with_custom_loss/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../models/30_regression_with_custom_loss_rmse_2_clipping_dynamic_threshold/' + name.replace("/", "_"), compile=False)
 
         # preds for regression curve
         x = np.arange(0, group["wip"].max() + 0.1 , 0.01)
@@ -222,7 +227,7 @@ def evaluate_models():
         plt.xlabel('wip')
         plt.ylabel('latency')
         plt.legend()
-        plt.show()
+        # plt.show()
         # plt.savefig('../Plots/residual_actual_domain/' + name.replace("/", "_") + '_loss.png')
         plt.close()
 
