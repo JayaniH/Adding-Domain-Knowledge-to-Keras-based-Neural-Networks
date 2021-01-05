@@ -39,3 +39,12 @@ def custom_loss_dynamic_threshold(threshold):
         return loss if loss <= threshold else (loss + 0.2 * K.sqrt(K.mean(K.square(domain_latency - y_pred))))
 
     return loss
+
+
+
+def custom_loss_approximation(y_l, y_u):
+
+    def loss(y_true, y_pred):
+        return K.sqrt(K.mean(K.square(y_pred - y_true))) + K.relu(y_l - y_pred) + K.relu(y_pred - y_u)
+
+    return loss

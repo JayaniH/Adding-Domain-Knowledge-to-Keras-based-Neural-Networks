@@ -130,6 +130,8 @@ def test():
         # wip
         # print(group["wip"].max())
 
+        print(group["wip"].median())
+
     print(new_df["latency"].median())
     print(np.percentile(new_df["latency"], 95))
 
