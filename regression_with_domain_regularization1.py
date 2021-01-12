@@ -76,26 +76,29 @@ def train_models():
         testY = test[["latency", "domain_latency"]]
         # print(trainY["latency"], trainY)
 
-        clipping_threshold = 0.2 * np.mean(trainY["latency"])
+        y_lower = np.mean(trainY["latency"]) - 3 * np.std(trainY["latency"])
+        y_upper = np.mean(trainY["latency"]) + 3 * np.std(trainY["latency"])
+
+        clipping_threshold = 0.1 * np.mean(trainY["latency"])
 
         scalerX = MinMaxScaler()
         trainX = scalerX.fit_transform(train["wip"].values.reshape(-1,1))
         testX = scalerX.transform(test["wip"].values.reshape(-1,1))
 
         # save scaler X
-        outfile = open("../models/34_regression_with_custom_loss_rmse_2_clipping_dynamic_threshold_mean_2/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "wb")
+        outfile = open("../models/51_regression_approximation_meam_3std_1_regularization_1_clipped_mean_1/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "wb")
         pkl.dump(scalerX, outfile)
         outfile.close()
 
         model = models.create_model(trainX.shape[1])
         opt = Adam(learning_rate=1e-2, decay=1e-3/200)
-        model.compile(loss=losses.custom_loss_dynamic_threshold(clipping_threshold), optimizer=opt)
+        model.compile(loss=losses.custom_loss_approximation_domain_regularization_clipped(y_lower, y_upper, clipping_threshold), optimizer=opt)
 
         print("[INFO] training model...")
         history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
         # save model
-        model.save('../models/34_regression_with_custom_loss_rmse_2_clipping_dynamic_threshold_mean_2/' + name.replace("/", "_"))
+        model.save('../models/51_regression_approximation_meam_3std_1_regularization_1_clipped_mean_1/' + name.replace("/", "_"))
 
         loss.append(history.history['loss'][-1])
         validation_loss.append(history.history['val_loss'][-1])
@@ -169,7 +172,7 @@ def evaluate_models():
 
         group["domain_latency"] = domain_model.predict(name, group["wip"], domain_model_parameters[name])
 
-        infile = open("../models/30_regression_with_custom_loss_rmse_2_clipping_dynamic_threshold/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../models/43_regression_approximation_mean_3std_01_regularization_1/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
         scalerX = pkl.load(infile)
         infile.close()
 
@@ -179,7 +182,7 @@ def evaluate_models():
 
         (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
-        model = keras.models.load_model('../models/30_regression_with_custom_loss_rmse_2_clipping_dynamic_threshold/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../models/43_regression_approximation_mean_3std_01_regularization_1/' + name.replace("/", "_"), compile=False)
 
         # preds for regression curve
         x = np.arange(0, group["wip"].max() + 0.1 , 0.01)
