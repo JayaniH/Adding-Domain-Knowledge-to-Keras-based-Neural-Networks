@@ -69,8 +69,8 @@ def train_models():
         trainY = train["latency"] 
         testY = test["latency"] 
 
-        y_lower = np.median(trainY) - 3 * np.std(trainY)
-        y_upper = np.median(trainY) + 3 * np.std(trainY)
+        y_lower = np.mean(trainY) - 3 * np.std(trainY)
+        y_upper = np.mean(trainY) + 3 * np.std(trainY)
 
         scalerx = MinMaxScaler()
 
@@ -79,7 +79,7 @@ def train_models():
 
         # save scaler
 
-        outfile = open("../models/37_regression_approximation_mid_3std/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb")
+        outfile = open("../models/40_regression_approximation_mean_3std/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb")
         pkl.dump(scalerx, outfile)
         outfile.close()
 
@@ -91,7 +91,7 @@ def train_models():
         history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
         # save model
-        model.save('../models/37_regression_approximation_mid_3std/' + name.replace("/", "_"))
+        model.save('../models/40_regression_approximation_mean_3std/' + name.replace("/", "_"))
         
         # get final loss
         loss.append(history.history['loss'][-1]) # * maxLatency
