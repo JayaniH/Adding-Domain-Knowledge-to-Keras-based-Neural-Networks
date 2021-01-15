@@ -10,8 +10,12 @@ def truncate_dataset(infile, outfile):
 
 def categorical_to_numerical(file):
     df = pd.read_csv(file, sep=",")
-    df['scenario'] = df['scenario'].astype('category')
-    df['scenario'] = df['scenario'].cat.codes
+    # categories 0/1
+    # df['scenario'] = df['scenario'].astype('category')
+    # df['scenario'] = df['scenario'].cat.codes
+
+    # categories 1/2
+    df['scenario'] = pd.factorize(df['scenario'])[0] + 1
     print(df)
     df.to_csv(file, index= False)
 
@@ -41,5 +45,5 @@ def group_and_plot(file):
     plt.show()
 
 # truncate_dataset('summary.csv', 'summary_truncated.csv')
-# categorical_to_numerical('summary_truncated.csv')
-group_and_plot('summary_truncated.csv')
+categorical_to_numerical('summary_truncated.csv')
+# group_and_plot('summary_truncated.csv')
