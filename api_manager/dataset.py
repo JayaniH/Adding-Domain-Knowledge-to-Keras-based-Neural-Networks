@@ -23,19 +23,26 @@ def group_and_plot(file):
     df = pd.read_csv(file, sep=',')
 
     for x in ['msg_size', 'concurrent_users']:
-        passthrough = df[df['scenario'] == 'Passthrough']
-        transformation = df[df['scenario'] == 'Transformation']
+        passthrough = df[df['scenario'] == 1]
+        transformation = df[df['scenario'] == 2]
 
         plt.yscale("log")
         plt.scatter(passthrough[x], passthrough['avg_response_time'], label='passthrough')
         plt.scatter(transformation[x], transformation['avg_response_time'], label='transformation')
+
+        a = 'concurrent_users' if x=='msg_size' else 'msg_size'
+        for i, txt in enumerate(passthrough[a]):
+            plt.annotate(txt, (passthrough[x][i]+1, passthrough['avg_response_time'][i]+1), color='blue')
+        for i, txt in enumerate(transformation[a]):
+            plt.annotate(txt, (transformation[x][24+i]+1, transformation['avg_response_time'][24+i]+1))
+
         plt.xlabel(x)
         plt.ylabel('avg_response_time')
         plt.legend()
         plt.show()
 
-    passthrough = df[df['scenario'] == 'Passthrough']
-    transformation = df[df['scenario'] == 'Transformation']
+    passthrough = df[df['scenario'] == 1]
+    transformation = df[df['scenario'] == 2]
     ax = plt.axes(projection='3d')
     ax.scatter3D(passthrough['msg_size'], passthrough['concurrent_users'], passthrough['avg_response_time'], c=passthrough['avg_response_time'])
     ax.scatter3D(transformation['msg_size'], transformation['concurrent_users'], transformation['avg_response_time'], c=transformation['avg_response_time'])
@@ -45,5 +52,5 @@ def group_and_plot(file):
     plt.show()
 
 # truncate_dataset('summary.csv', 'summary_truncated.csv')
-categorical_to_numerical('summary_truncated.csv')
-# group_and_plot('summary_truncated.csv')
+# categorical_to_numerical('summary_truncated.csv')
+group_and_plot('summary_truncated.csv')
