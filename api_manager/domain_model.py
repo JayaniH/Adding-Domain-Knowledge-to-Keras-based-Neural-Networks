@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt 
 from scipy.optimize import curve_fit
+import random
 
 def f(X, s, k, l, a1, b1, a2, b2):
     x1 = X['scenario']
@@ -20,14 +21,12 @@ def create_model(df, seed):
 
     predY = f(test[['scenario', 'msg_size', 'concurrent_users']], s, k, l, a1, b1, a2, b2)
     rmse = np.sqrt(np.mean(np.square(predY - test['avg_response_time'])))
-    print('\navg_response_time:\n',"\n".join([str(val) for val in test['avg_response_time'].values]))
-    print('\npredicted avg_response_time:\n', "\n".join([str(val) for val in predY.values]))
-    print("RMSE -> ", rmse)
+    print('\navg_response_time:\n','\n'.join([str(val) for val in test['avg_response_time'].values]))
+    print('\npredicted avg_response_time:\n', '\n'.join([str(val) for val in predY.values]))
+    print('RMSE -> ', rmse)
 
     x_max = max(max(df['msg_size']), max(df['concurrent_users']))
     size = max(df['concurrent_users'])
-
-    plt.yscale("linear")
 
     for msg in [50, 1024, 10240, 102400]:
 
@@ -37,41 +36,41 @@ def create_model(df, seed):
         new_df = pd.DataFrame({'scenario': x1, 'msg_size': x2, 'concurrent_users': x3})
         y = f(new_df[['scenario', 'msg_size', 'concurrent_users']], s, k, l, a1, b1, a2, b2)
 
-        df_filtered = df[df['msg_size'] == msg]
-        plt.yscale("log")
-        plt.plot(x3, y, label="msg_size="+str(msg))
+        df_filtered = df[(df['msg_size'] == msg) & (df['scenario'] == 1)]
+        # plt.yscale('log')
+        plt.plot(x3, y, label='msg_size='+str(msg))
         plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
 
     # plt.scatter(df['concurrent_users'], df['avg_response_time'])
+    plt.title('scenario = passthrough')
     plt.xlabel('concurrent_users')
     plt.ylabel('avg_response_time')
     plt.legend()
     # plt.show()
-    plt.savefig('../../Plots/_api_manager/4_domain_model_test2_log/' + str(seed+1) + '_msg_size.png')
+    plt.savefig('../../Plots/_api_manager/5_domain_model_test3_randint/' + str(seed+1) + '_msg_size.png')
     plt.close()
-
-    plt.yscale("linear")
 
     for scenario_id in [1,2]:
 
-        scenario = "passthrough" if scenario_id == 1 else "transformation"
+        scenario = 'passthrough' if scenario_id == 1 else 'transformation'
         x1 = np.full((1000,), scenario_id)
         x2 = np.full((1000,), 50)
         x3 = np.arange(0, 1000, 1)
         new_df = pd.DataFrame({'scenario': x1, 'msg_size': x2, 'concurrent_users': x3})
         y = f(new_df[['scenario', 'msg_size', 'concurrent_users']], s, k, l, a1, b1, a2, b2)
 
-        df_filtered = df[df['scenario'] == scenario_id]
-        plt.yscale("log")
-        plt.plot(x3, y, label="scenario="+str(scenario))
+        df_filtered = df[(df['scenario'] == scenario_id) & (df['msg_size'] == 50)]
+        # plt.yscale('log')
+        plt.plot(x3, y, label='scenario='+str(scenario))
         plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
 
     # plt.scatter(df['concurrent_users'], df['avg_response_time'])
+    plt.title('msg_size = 50')
     plt.xlabel('concurrent_users')
     plt.ylabel('avg_response_time')
     plt.legend()
     # plt.show()
-    plt.savefig('../../Plots/_api_manager/4_domain_model_test2_log/' + str(seed+1) + '_scenario.png')
+    plt.savefig('../../Plots/_api_manager/5_domain_model_test3_randint/' + str(seed+1) + '_scenario.png')
     plt.close()
 
     # ax = plt.axes(projection='3d')
@@ -90,10 +89,17 @@ def get_average_error():
     
     for i in range(5):
         print('\ncase', i+1)
-        params, rmse = create_model(df, i)
+        random.seed(i)
+        params, rmse = create_model(df, random.randint(0,100))
         error.append(rmse)
 
-    print("\n".join([str(e) for e in error]), "\n\n")
+    print('\n'.join([str(e) for e in error]), '\n\n')
     print(np.mean(error))
 
-get_average_error()
+def predict(x, params):
+    [s, k, l, a1, b1, a2, b2] = params
+    y = f(x, s, k, l, a1, b1, a2, b2)
+
+    return y
+
+# get_average_error()
