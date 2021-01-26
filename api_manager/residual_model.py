@@ -131,7 +131,7 @@ def evaluate_model():
     scalerX = pkl.load(infile)
     infile.close()
 
-    (train, test) = train_test_split(df, test_size=0.3, random_state=42)
+    (train, test) = train_test_split(df, test_size=0.3, random_state=1)
 
     model = keras.models.load_model('../../models/api_manager/1_residual_model/model', compile=False)
 
@@ -148,6 +148,9 @@ def evaluate_model():
     rmse = np.sqrt(np.mean(np.square(test['avg_response_time'].values - pred_response_time)))
     # mae = np.mean(np.abs(test['avg_response_time'].values - pred_response_time))
     prediction_loss = rmse
+
+    print('\navg_response_time:\n','\n'.join([str(val) for val in test['avg_response_time'].values]))
+    print('\npredicted avg_response_time:\n', '\n'.join([str(val) for val in pred_response_time.values]))
 
 
     for msg in [50, 1024, 10240, 102400]:
@@ -168,12 +171,12 @@ def evaluate_model():
         plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
 
     # plt.scatter(df['concurrent_users'], df['avg_response_time'])
-    plt.title('scenario = passthrough')
+    plt.title('Residual Model : scenario = passthrough')
     plt.xlabel('concurrent_users')
     plt.ylabel('avg_response_time')
     plt.legend()
-    plt.show()
-    # plt.savefig('../../Plots/_api_manager/4_domain_model_test2_log/msg_size.png')
+    # plt.show()
+    plt.savefig('../../Plots/_api_manager/7_residual_model/msg_size.png')
     plt.close()
 
     for scenario_id in [1,2]:
@@ -195,12 +198,12 @@ def evaluate_model():
         plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
 
     # plt.scatter(df['concurrent_users'], df['avg_response_time'])
-    plt.title('msg_size = 50')
+    plt.title('Residual Model : msg_size = 50')
     plt.xlabel('concurrent_users')
     plt.ylabel('avg_response_time')
     plt.legend()
-    plt.show()
-    # plt.savefig('../../Plots/_api_manager/4_domain_model_test2_log/scenario.png')
+    # plt.show()
+    plt.savefig('../../Plots/_api_manager/7_residual_model/scenario.png')
     plt.close()
 
     print('prediction_loss/sample_loss/sample_predction_loss', prediction_loss)
