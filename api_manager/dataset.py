@@ -19,6 +19,14 @@ def categorical_to_numerical(file):
     print(df)
     df.to_csv(file, index= False)
 
+def summarize(file):
+    df = pd.read_csv(file, sep=",")
+    print(df['avg_response_time'].mean())
+    print(df['avg_response_time'].median())
+    print(df['avg_response_time'].std())
+    print(df['avg_response_time'].median()+ df['avg_response_time'].std())
+
+
 def group_and_plot(file):
     df = pd.read_csv(file, sep=',')
 
@@ -51,6 +59,42 @@ def group_and_plot(file):
     ax.set_zlabel('avg_response_time')
     plt.show()
 
+def plot_as_categories(file):
+    df = pd.read_csv(file, sep=',')
+    for msg in [50, 1024, 10240, 102400]:
+
+        df_filtered = df[(df['msg_size'] == msg) & (df['scenario'] == 1)]
+        # plt.yscale('log')
+        plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'], label='msg_size='+str(msg))
+
+    # plt.scatter(df['concurrent_users'], df['avg_response_time'])
+    plt.title('Dataset : scenario = passthrough')
+    plt.xlabel('concurrent_users')
+    plt.ylabel('avg_response_time')
+    plt.legend()
+    plt.show()
+    # plt.savefig('../../Plots/_api_manager/13_domain_model_minimization_regularization_upper_mean_5std_lower_mean_01std/' + str(i+1) + '_msg_size.png')
+    plt.close()
+
+    for scenario_id in [1,2]:
+
+        scenario = 'passthrough' if scenario_id == 1 else 'transformation'
+       
+        df_filtered = df[(df['scenario'] == scenario_id) & (df['msg_size'] == 50)]
+        # plt.yscale('log')
+        plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'], label='scenario='+str(scenario))
+
+    # plt.scatter(df['concurrent_users'], df['avg_response_time'])
+    plt.title('Dataset : msg_size = 50')
+    plt.xlabel('concurrent_users')
+    plt.ylabel('avg_response_time')
+    plt.legend()
+    plt.show()
+    # plt.savefig('../../Plots/_api_manager/13_domain_model_minimization_regularization_upper_mean_5std_lower_mean_01std/' + str(i+1) + '_scenario.png')
+    plt.close()
+
 # truncate_dataset('summary.csv', 'summary_truncated.csv')
 # categorical_to_numerical('summary_truncated.csv')
-group_and_plot('summary_truncated.csv')
+# group_and_plot('summary_truncated.csv')
+# summarize('summary_truncated.csv')
+plot_as_categories('summary_truncated.csv')

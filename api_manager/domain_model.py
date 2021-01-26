@@ -3,21 +3,57 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt 
 from scipy.optimize import curve_fit
+from scipy.optimize import minimize
 import random
+
+# def f(X, s, k, l, a1, b1, a2, b2):
+#     x1 = X['scenario']
+#     x2 = X['msg_size']
+#     x3 = X['concurrent_users']
+
+#     y = ((1 + s*(x3-1) + k*x3*(x3-1))/l) * (a1 * x1 + a2 * x2) + (b1 * x1 + b2 * x2)
+#     return y
 
 def f(X, s, k, l, a1, b1, a2, b2):
     x1 = X['scenario']
     x2 = X['msg_size']
     x3 = X['concurrent_users']
 
-    return ((1 + s*(x3-1) + k*x3*(x3-1))/l) * (a1 * x1 + a2 * x2) + (b1 * x1 + b2 * x2)
+    y = (b1 * x1 + b2 * x2 + s/l) * x3
+    return y
 
-def create_model(df, seed):
+def cost(params, X, y_true, upper, lower):
+    # print('const func', params, X, y_true)
+    [s, k, l, a1, b1, a2, b2] = params
+    y_pred = f(X, s, k, l, a1, b1, a2, b2)
+    limit_regularization = np.mean(np.maximum(0.0, (y_pred - upper))) + np.mean(np.maximum(0.0, (lower - y_pred)))
+    param_regularization = 5 * np.square(a1) + 5 * np.square(a2) + 5 * np.square(k) + 5 * np.square(b1) + 5 * np.square(b2) + 5 * np.square(s)
+    regularization = param_regularization
+    # print('regularization--->', regularization)
+    loss = np.sqrt(np.mean(np.square(y_pred - y_true))) + regularization
+    # print('pred', y_pred)
+    return loss
+
+
+def create_model(df, i):
+
+    random.seed(i*2)
+    seed = random.randint(1,100)
+    print('i, seed ', i, seed)
+
+    upper = np.mean(df['avg_response_time']) + 0.5 * np.std(df['avg_response_time'])
+    lower = np.mean(df['avg_response_time']) - 0.01 * np.std(df['avg_response_time'])
+    print(np.mean(df['avg_response_time']))
+    print(np.std(df['avg_response_time']))
+    print('upper/lower=', upper, lower)
 
     (train, test) = train_test_split(df, test_size=0.3, random_state=seed)
 
-    params, cov = curve_fit(f, train[['scenario', 'msg_size', 'concurrent_users']], train['avg_response_time'], bounds=([0,0,0,0,0,0,0],[np.inf,10,np.inf,np.inf,np.inf,np.inf,np.inf]))
-    [s, k, l, a1, b1, a2, b2] = params
+    # params, cov = curve_fit(f, train[['scenario', 'msg_size', 'concurrent_users']], train['avg_response_time'], bounds=([0,0,0,0,0,0,0],[np.inf,10,np.inf,np.inf,np.inf,np.inf,np.inf]))
+    result = minimize(cost, [1,0,1,0,0,0,0], args=(train[['scenario', 'msg_size', 'concurrent_users']], train['avg_response_time'], upper, lower), bounds=((0, np.inf), (0, np.inf), (0, np.inf), (0, np.inf), (0, np.inf), (0, np.inf), (0, np.inf)))
+    # print('result', result)
+    print('params--->', result.x)
+    [s, k, l, a1, b1, a2, b2] = result.x
 
     predY = f(test[['scenario', 'msg_size', 'concurrent_users']], s, k, l, a1, b1, a2, b2)
     rmse = np.sqrt(np.mean(np.square(predY - test['avg_response_time'])))
@@ -42,12 +78,12 @@ def create_model(df, seed):
         plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
 
     # plt.scatter(df['concurrent_users'], df['avg_response_time'])
-    plt.title('scenario = passthrough')
+    plt.title('Domain Model : scenario = passthrough')
     plt.xlabel('concurrent_users')
     plt.ylabel('avg_response_time')
     plt.legend()
-    # plt.show()
-    plt.savefig('../../Plots/_api_manager/5_domain_model_test3_randint/' + str(seed+1) + '_msg_size.png')
+    plt.show()
+    # plt.savefig('../../Plots/_api_manager/13_domain_model_minimization_regularization_upper_mean_5std_lower_mean_01std/' + str(i+1) + '_msg_size.png')
     plt.close()
 
     for scenario_id in [1,2]:
@@ -65,12 +101,12 @@ def create_model(df, seed):
         plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
 
     # plt.scatter(df['concurrent_users'], df['avg_response_time'])
-    plt.title('msg_size = 50')
+    plt.title('Domain Model : msg_size = 50')
     plt.xlabel('concurrent_users')
     plt.ylabel('avg_response_time')
     plt.legend()
-    # plt.show()
-    plt.savefig('../../Plots/_api_manager/5_domain_model_test3_randint/' + str(seed+1) + '_scenario.png')
+    plt.show()
+    # plt.savefig('../../Plots/_api_manager/13_domain_model_minimization_regularization_upper_mean_5std_lower_mean_01std/' + str(i+1) + '_scenario.png')
     plt.close()
 
     # ax = plt.axes(projection='3d')
@@ -78,10 +114,10 @@ def create_model(df, seed):
     # ax.set_xlabel('msg_size')
     # ax.set_ylabel('concurrent_users')
     # ax.set_zlabel('avg_response_time')
-    # plt.show()
+    plt.show()
     # print(df)
 
-    return params, rmse
+    return result.x, rmse
 
 def get_average_error():
     error = []
@@ -89,12 +125,11 @@ def get_average_error():
     
     for i in range(5):
         print('\ncase', i+1)
-        random.seed(i)
-        params, rmse = create_model(df, random.randint(0,100))
+        params, rmse = create_model(df, i)
         error.append(rmse)
 
     print('\n'.join([str(e) for e in error]), '\n\n')
-    print(np.mean(error))
+    print('mean error --->', np.mean(error))
 
 def predict(x, params):
     [s, k, l, a1, b1, a2, b2] = params
@@ -102,4 +137,4 @@ def predict(x, params):
 
     return y
 
-# get_average_error()
+get_average_error()
