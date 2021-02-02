@@ -21,10 +21,26 @@ def categorical_to_numerical(file):
 
 def summarize(file):
     df = pd.read_csv(file, sep=",")
-    print(df['avg_response_time'].mean())
-    print(df['avg_response_time'].median())
-    print(df['avg_response_time'].std())
-    print(df['avg_response_time'].median()+ df['avg_response_time'].std())
+    print('\navg_response_time')
+    print('Min', df['avg_response_time'].min())
+    print('Max', df['avg_response_time'].max())
+    print('Mean', df['avg_response_time'].mean())
+    print('Median', df['avg_response_time'].median())
+    print('Standard Deviation', df['avg_response_time'].std())
+
+    print('\nconcurrent_users')
+    print('Min', df['concurrent_users'].min())
+    print('Max', df['concurrent_users'].max())
+    print('Mean', df['concurrent_users'].mean())
+    print('Median', df['concurrent_users'].median())
+    print('Standard Deviation', df['concurrent_users'].std())
+
+    print('\nmsg_size')
+    print('Min', df['msg_size'].min())
+    print('Max', df['msg_size'].max())
+    print('Mean', df['msg_size'].mean())
+    print('Median', df['msg_size'].median())
+    print('Standard Deviation', df['msg_size'].std())
 
 
 def group_and_plot(file):

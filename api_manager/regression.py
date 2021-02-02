@@ -27,7 +27,7 @@ df = pd.read_csv('summary_truncated.csv', sep=',')
 def train_model():
     
     print('[INFO] constructing training/testing split...')
-    (train, test) = train_test_split(df, test_size=0.3, random_state=1)
+    (train, test) = train_test_split(df, test_size=0.3, random_state=81)
 
     print('[INFO] processing data...')
 
@@ -41,9 +41,9 @@ def train_model():
     testX = scalerX.transform(test[['scenario', 'msg_size', 'concurrent_users']].values.reshape(-1,3))
 
     # save scaler X
-    outfile = open('../../models/api_manager/2_regression/_scalars/scalerX.pkl', 'wb')
-    pkl.dump(scalerX, outfile)
-    outfile.close()
+    # outfile = open('../../models/api_manager/2_regression/_scalars/scalerX.pkl', 'wb')
+    # pkl.dump(scalerX, outfile)
+    # outfile.close()
 
     model = models.create_model(trainX.shape[1])
     opt = Adam(learning_rate=1e-2, decay=1e-3/200)
@@ -53,7 +53,7 @@ def train_model():
     history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
     # save model
-    model.save('../../models/api_manager/2_regression/model')
+    # model.save('../../models/api_manager/2_regression/model')
 
     # get final loss for residual prediction
     # loss.append(scalerY.inverse_transform(np.array(history.history['loss'][-1]).reshape(-1,3))[0,0])
@@ -206,6 +206,6 @@ def get_residual_model_forecasts():
 
     return y
 
-# train_model()
-evaluate_model()
+train_model()
+# evaluate_model()
 # print(get_residual_model_forecasts())
