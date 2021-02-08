@@ -16,7 +16,7 @@ def create_model(dim):
     model.add(Dense(8, input_dim=dim, activation="relu"))
     model.add(Dense(6, activation="relu"))
     model.add(Dense(4, activation="relu"))
-    model.add(Dense(1, activation="linear"))
+    model.add(Dense(1, activation="relu"))
 
     return model
 

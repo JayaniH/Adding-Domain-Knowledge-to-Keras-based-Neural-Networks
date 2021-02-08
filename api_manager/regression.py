@@ -24,10 +24,14 @@ def root_mean_squared_percentage_error(y_true, y_pred):
 print('[INFO] loading data...')
 df = pd.read_csv('summary_truncated.csv', sep=',')
 
-def train_model():
+def train_model(i):
+
+    random.seed(i*2)
+    seed = random.randint(1,100)
+    print('i, seed ', i, seed)
     
     print('[INFO] constructing training/testing split...')
-    (train, test) = train_test_split(df, test_size=0.3, random_state=81)
+    (train, test) = train_test_split(df, test_size=0.3, random_state=seed)
 
     print('[INFO] processing data...')
 
@@ -41,9 +45,9 @@ def train_model():
     testX = scalerX.transform(test[['scenario', 'msg_size', 'concurrent_users']].values.reshape(-1,3))
 
     # save scaler X
-    # outfile = open('../../models/api_manager/2_regression/_scalars/scalerX.pkl', 'wb')
-    # pkl.dump(scalerX, outfile)
-    # outfile.close()
+    outfile = open('../../models/api_manager/3_regression_relu/_scalars/scalerX_' + str(i+1) +'.pkl', 'wb')
+    pkl.dump(scalerX, outfile)
+    outfile.close()
 
     model = models.create_model(trainX.shape[1])
     opt = Adam(learning_rate=1e-2, decay=1e-3/200)
@@ -53,7 +57,7 @@ def train_model():
     history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
     # save model
-    # model.save('../../models/api_manager/2_regression/model')
+    model.save('../../models/api_manager/3_regression_relu/case' + str(i+1))
 
     # get final loss for residual prediction
     # loss.append(scalerY.inverse_transform(np.array(history.history['loss'][-1]).reshape(-1,3))[0,0])
@@ -64,6 +68,8 @@ def train_model():
 
     print('[INFO] predicting latency...')
     pred_response_time = model.predict(testX)
+
+    # print('\navg_response_time:\n','\n'.join([str(val) for val in test['avg_response_time'].values]))
 
     rmse = np.sqrt(np.mean(np.square(test['avg_response_time'].values - pred_response_time.flatten())))
     # mae = np.mean(np.abs(test['avg_response_time'].values - pred_response_time))
@@ -109,16 +115,22 @@ def train_model():
 
     print('loss/val_loss/prediction_loss/sample_loss/sample_predction_loss', loss, validation_loss, prediction_loss)
 
+    return prediction_loss, pred_response_time.flatten()
 
-def evaluate_model():
 
-    infile = open('../../models/api_manager/2_regression/_scalars/scalerX.pkl', 'rb')
+def evaluate_model(i):
+
+    random.seed(i*2)
+    seed = random.randint(1,100)
+    print('i, seed ', i, seed)
+
+    infile = open('../../models/api_manager/3_regression_relu/_scalars/scalerX_' + str(i+1) +'.pkl', 'rb')
     scalerX = pkl.load(infile)
     infile.close()
 
-    (train, test) = train_test_split(df, test_size=0.3, random_state=42)
+    (train, test) = train_test_split(df, test_size=0.3, random_state=seed)
 
-    model = keras.models.load_model('../../models/api_manager/2_regression/model', compile=False)
+    model = keras.models.load_model('../../models/api_manager/3_regression_relu/case' + str(i+1), compile=False)
 
 
     # preds for dataset
@@ -156,7 +168,7 @@ def evaluate_model():
     plt.ylabel('avg_response_time')
     plt.legend()
     # plt.show()
-    plt.savefig('../../Plots/_api_manager/6_regression/msg_size.png')
+    # plt.savefig('../../Plots/_api_manager/6_regression/msg_size.png')
     plt.close()
 
     for scenario_id in [1,2]:
@@ -181,21 +193,21 @@ def evaluate_model():
     plt.ylabel('avg_response_time')
     plt.legend()
     # plt.show()
-    plt.savefig('../../Plots/_api_manager/6_regression/scenario.png')
+    # plt.savefig('../../Plots/_api_manager/6_regression/scenario.png')
     plt.close()
 
-    print('prediction_loss/sample_loss/sample_predction_loss', prediction_loss)
+    print('prediction_loss/sample_loss/sample_predction_loss', prediction_loss, '\n')
     
     return prediction_loss
 
 
-def get_residual_model_forecasts():
+def get_rregression_model_forecasts():
 
-    infile = open('../../models/api_manager/2_regression/_scalars/scalerX.pkl', 'rb')
+    infile = open('../../models/api_manager/3_regression_relu/_scalars/scalerX.pkl', 'rb')
     scalerX = pkl.load(infile)
     infile.close()
 
-    model = keras.models.load_model('../../models/api_manager/2_regression/model', compile=False)
+    model = keras.models.load_model('../../models/api_manager/3_regression_relu/model', compile=False)
 
     x1 = np.full((1000,), 1)
     x2 = np.full((1000,), 50)
@@ -206,6 +218,38 @@ def get_residual_model_forecasts():
 
     return y
 
-train_model()
+def cross_validation():
+    error = []
+    predictions = []
+    
+    for i in range(5):
+        print('\ncase', i+1)
+        rmse, preds = train_model(i)
+        error.append(rmse)
+        predictions.append(preds)
+        print('\n'.join([str(p) for p in predictions[i]]), '\n\n')
+        print('rmse--->', error[i], '\n')
+        print('------------------------')
+
+    print('\n'.join([str(e) for e in error]), '\n\n')
+    print('mean error --->', np.mean(error))
+
+
+def evalate():
+    error = []
+    
+    for i in range(5):
+        print('\ncase', i+1)
+        rmse = evaluate_model(i)
+        error.append(rmse)
+        print('rmse--->', error[i], '\n')
+        print('------------------------')
+
+    print('\n'.join([str(e) for e in error]), '\n\n')
+    print('mean error --->', np.mean(error))
+
+
+# train_model()
 # evaluate_model()
-# print(get_residual_model_forecasts())
+# cross_validation()
+evalate()
