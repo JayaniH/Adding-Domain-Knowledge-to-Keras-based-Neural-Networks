@@ -29,9 +29,9 @@ def cost(params, X, y_true, upper, lower):
 
     # limit_regularization = np.mean(np.maximum(0.0, (y_pred - upper))) + np.mean(np.maximum(0.0, (lower - y_pred)))
     param_regularization = 10000 * ((a * k) / l) + 1000 * (((s - k) * a) / l) + 10 * a 
-    # param_regularization = 10000 * (k * (a1 + a2) / l) + 10 * ((s - k) * (a1 + a2) / l)
+    # param_regularization = 100000 * (k * (a1 + a2) / l) + 10 * ((s - k) * (a1 + a2) / l)
 
-    regularization = 4000 * param_regularization
+    regularization = param_regularization
     # print('regularization--->', regularization)
     loss = np.sqrt(np.mean(np.square(y_pred - y_true)))
     # print('pred', y_pred)
@@ -156,7 +156,7 @@ def test_regularization():
         print('concurrent_users = ', c, '\n')
         # print(X['concurrent_users'])
 
-        result = minimize(cost, [0,0,1,0,0], args=(X, Y, 1, 1), bounds=((0, np.inf), (0, np.inf), (0, np.inf), (0, np.inf), (0, np.inf)))
+        result = minimize(cost, [0,0,1,0,0,0,0], args=(X, Y, 1, 1), bounds=((0, np.inf), (0, np.inf), (0, np.inf), (0, np.inf), (0, np.inf), (0, np.inf), (0, np.inf)))
         # print('result', result)
         print('params--->', result.x)
         [s, k, l, a, b] = result.x
