@@ -45,9 +45,9 @@ def train_model(i):
     testX = scalerX.transform(test[['scenario', 'msg_size', 'concurrent_users']].values.reshape(-1,3))
 
     # save scaler X
-    outfile = open('../../models/api_manager/3_regression_relu/_scalars/scalerX_' + str(i+1) +'.pkl', 'wb')
-    pkl.dump(scalerX, outfile)
-    outfile.close()
+    # outfile = open('../../models/api_manager/3_regression_relu/_scalars/scalerX_' + str(i+1) +'.pkl', 'wb')
+    # pkl.dump(scalerX, outfile)
+    # outfile.close()
 
     model = models.create_model(trainX.shape[1])
     opt = Adam(learning_rate=1e-2, decay=1e-3/200)
@@ -57,7 +57,7 @@ def train_model(i):
     history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
     # save model
-    model.save('../../models/api_manager/3_regression_relu/case' + str(i+1))
+    # model.save('../../models/api_manager/3_regression_relu/case' + str(i+1))
 
     # get final loss for residual prediction
     # loss.append(scalerY.inverse_transform(np.array(history.history['loss'][-1]).reshape(-1,3))[0,0])
@@ -251,5 +251,5 @@ def evalate():
 
 # train_model()
 # evaluate_model()
-# cross_validation()
-evalate()
+cross_validation()
+# evalate()

@@ -26,7 +26,7 @@ print('[INFO] loading data...')
 df = pd.read_csv('summary_truncated.csv', sep=',')
 
 # fit domain model parameters
-domain_model_parameters, _ = domain_model.create_model(df, random.randint(0,100))
+domain_model_parameters, _ = domain_model.create_model(df, 2)
 
 def train_model():
     
@@ -34,7 +34,7 @@ def train_model():
     df['residuals'] = df['domain_prediction'] - df['avg_response_time']
 
     print('[INFO] constructing training/testing split...')
-    (train, test) = train_test_split(df, test_size=0.3, random_state=42)
+    (train, test) = train_test_split(df, test_size=0.3, random_state=74)
 
     print('[INFO] processing data...')
 
@@ -48,7 +48,7 @@ def train_model():
     testX = scalerX.transform(test[['scenario', 'msg_size', 'concurrent_users']].values.reshape(-1,3))
 
     # save scaler X
-    outfile = open('../../models/api_manager/1_residual_model/_scalars/scalerX.pkl', 'wb')
+    outfile = open('../../models/api_manager/4_residual_model/_scalars/scalerX.pkl', 'wb')
     pkl.dump(scalerX, outfile)
     outfile.close()
 
@@ -60,7 +60,7 @@ def train_model():
     history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
     # save model
-    model.save('../../models/api_manager/1_residual_model/model')
+    model.save('../../models/api_manager/4_residual_model/model')
 
     # get final loss for residual prediction
     # loss.append(scalerY.inverse_transform(np.array(history.history['loss'][-1]).reshape(-1,3))[0,0])
@@ -127,13 +127,13 @@ def evaluate_model():
     df['domain_prediction'] = domain_model.predict(df[['scenario', 'msg_size', 'concurrent_users']], domain_model_parameters)
     df['residuals'] = df['domain_prediction'] - df['avg_response_time']
 
-    infile = open('../../models/api_manager/1_residual_model/_scalars/scalerX.pkl', 'rb')
+    infile = open('../../models/api_manager/4_residual_model/_scalars/scalerX.pkl', 'rb')
     scalerX = pkl.load(infile)
     infile.close()
 
-    (train, test) = train_test_split(df, test_size=0.3, random_state=1)
+    (train, test) = train_test_split(df, test_size=0.3, random_state=74)
 
-    model = keras.models.load_model('../../models/api_manager/1_residual_model/model', compile=False)
+    model = keras.models.load_model('../../models/api_manager/4_residual_model/model', compile=False)
 
 
     # preds for dataset
@@ -216,11 +216,11 @@ def get_residual_model_forecasts():
     df['domain_prediction'] = domain_model.predict(df[['scenario', 'msg_size', 'concurrent_users']], domain_model_parameters)
     df['residuals'] = df['domain_prediction'] - df['avg_response_time']
 
-    infile = open('../../models/api_manager/1_residual_model/_scalars/scalerX.pkl', 'rb')
+    infile = open('../../models/api_manager/4_residual_model/_scalars/scalerX.pkl', 'rb')
     scalerX = pkl.load(infile)
     infile.close()
 
-    model = keras.models.load_model('../../models/api_manager/1_residual_model/model', compile=False)
+    model = keras.models.load_model('../../models/api_manager/4_residual_model/model', compile=False)
 
     x1 = np.full((1000,), 1)
     x2 = np.full((1000,), 50)

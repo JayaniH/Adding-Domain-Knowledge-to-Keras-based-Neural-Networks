@@ -14,12 +14,20 @@ import random
 #     y = ((1 + s*(x3-1) + k*x3*(x3-1))/l) * (a1 * x1 + a2 * x2) + (b1 * x1 + b2 * x2)
 #     return y
 
+# def f(X, s, k, l, a, b):
+#     x1 = X['scenario']
+#     x2 = X['msg_size']
+#     x3 = X['concurrent_users']
+
+#     y = ((1 + s*(x3-1) + k*x3*(x3-1))/l) * (a * x1 * x2) + (b * x1 * x2)
+#     return y
+
 def f(X, s, k, l, a, b):
     x1 = X['scenario']
     x2 = X['msg_size']
     x3 = X['concurrent_users']
 
-    y = ((1 + s*(x3-1) + k*x3*(x3-1))/l) * (a * x1 * x2) + (b * x1 * x2)
+    y = ((1 + s*(x3-1) + k*x3*(x3-1))/l) * (1 + a*x2 + b*x1)
     return y
 
 def cost(params, X, y_true, upper, lower):
@@ -28,10 +36,17 @@ def cost(params, X, y_true, upper, lower):
     y_pred = f(X, s, k, l, a, b)
 
     # limit_regularization = np.mean(np.maximum(0.0, (y_pred - upper))) + np.mean(np.maximum(0.0, (lower - y_pred)))
-    param_regularization = 10000 * ((a * k) / l) + 1000 * (((s - k) * a) / l) + 10 * a 
+
+    #3
+    param_regularization = 10000 * (k * (1 + a + b)/l) + 1000 * (s-k) * (1 + a + b)/l
+
+    #2
+    # param_regularization = 10000 * ((a * k) / l) + 1000 * (((s - k) * a) / l) + 10 * a 
+
+    #1
     # param_regularization = 100000 * (k * (a1 + a2) / l) + 10 * ((s - k) * (a1 + a2) / l)
 
-    regularization = param_regularization
+    regularization = 100000 * param_regularization
     # print('regularization--->', regularization)
     loss = np.sqrt(np.mean(np.square(y_pred - y_true)))
     # print('pred', y_pred)
