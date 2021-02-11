@@ -46,7 +46,7 @@ def cost(params, X, y_true, upper, lower):
     #1
     # param_regularization = 100000 * (k * (a1 + a2) / l) + 10 * ((s - k) * (a1 + a2) / l)
 
-    regularization = 100000 * param_regularization
+    regularization = 1000 * param_regularization
     # print('regularization--->', regularization)
     loss = np.sqrt(np.mean(np.square(y_pred - y_true)))
     # print('pred', y_pred)
