@@ -15,7 +15,15 @@ def categorical_to_numerical(file):
     # df['scenario'] = df['scenario'].cat.codes
 
     # categories 1/2
-    df['scenario'] = pd.factorize(df['scenario'])[0] + 1
+    # df['scenario'] = pd.factorize(df['scenario'])[0] + 1
+
+    # one hot encoding
+    df['scenario'] = df['scenario'].str.lower()
+    one_hot = pd.get_dummies(df['scenario'], prefix='scenario')
+    df = pd.concat([df, one_hot], axis=1)
+    # df = df.drop(columns=['scenario'])
+    print(one_hot)
+    
     print(df)
     df.to_csv(file, index= False)
 
@@ -113,4 +121,4 @@ def plot_as_categories(file):
 # categorical_to_numerical('summary_truncated.csv')
 # group_and_plot('summary_truncated.csv')
 # summarize('summary_truncated.csv')
-plot_as_categories('summary_truncated.csv')
+# plot_as_categories('summary_truncated.csv')
