@@ -26,15 +26,19 @@ print('[INFO] loading data...')
 df = pd.read_csv('summary_truncated.csv', sep=',')
 
 # fit domain model parameters
-domain_model_parameters, _ = domain_model.create_model(df, 2)
 
-def train_model():
+def train_model(i):
+    random.seed(i*2)
+    seed = random.randint(1,100)
+    print('i, seed ', i, seed)
+
+    domain_model_parameters, _ = domain_model.create_model(df, i)
     
     df['domain_prediction'] = domain_model.predict(df[['scenario', 'msg_size', 'concurrent_users']], domain_model_parameters)
     df['residuals'] = df['domain_prediction'] - df['avg_response_time']
 
     print('[INFO] constructing training/testing split...')
-    (train, test) = train_test_split(df, test_size=0.3, random_state=74)
+    (train, test) = train_test_split(df, test_size=0.3, random_state=seed)
 
     print('[INFO] processing data...')
 
@@ -48,7 +52,7 @@ def train_model():
     testX = scalerX.transform(test[['scenario', 'msg_size', 'concurrent_users']].values.reshape(-1,3))
 
     # save scaler X
-    outfile = open('../../models/api_manager/4_residual_model/_scalars/scalerX.pkl', 'wb')
+    outfile = open('../../models/api_manager/new_model/_scalars/scalerX.pkl', 'wb')
     pkl.dump(scalerX, outfile)
     outfile.close()
 
@@ -57,10 +61,10 @@ def train_model():
     model.compile(loss=root_mean_squared_error, optimizer=opt)
 
     print('[INFO] training model...')
-    history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
+    history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=300, batch_size=4)
 
     # save model
-    model.save('../../models/api_manager/4_residual_model/model')
+    model.save('../../models/api_manager/new_model/model')
 
     # get final loss for residual prediction
     # loss.append(scalerY.inverse_transform(np.array(history.history['loss'][-1]).reshape(-1,3))[0,0])
@@ -72,6 +76,11 @@ def train_model():
     print('[INFO] predicting latency...')
     predY = model.predict(testX)
 
+    domain_error = np.sqrt(np.mean(np.square(test['domain_prediction'] - test['avg_response_time'])))
+    print('domain_error', domain_error)
+    residual_error = np.sqrt(np.mean(np.square(testY.values - predY.flatten())))
+    print('residual_error', residual_error)
+
     # predY = residuals = domain_prediction - latency
     # pred_response_time = domain_prediction  - (domain_prediction - latency)
 
@@ -81,59 +90,39 @@ def train_model():
     # mae = np.mean(np.abs(test['avg_response_time'].values - pred_response_time))
     prediction_loss = rmse
 
-    # # evaluation using bucket method
-    # error = []
-    # pred_error = []
+    print('\navg_response_time:\n','\n'.join([str(val) for val in test['avg_response_time'].values]))
+    print('\npredicted avg_response_time by hybrid model:\n', '\n'.join([str(val) for val in pred_response_time.values]))
 
-    # for i in range(5):
-    #     test_sample = datasets.get_test_sample(test)
-    #     testX = scalerX.transform(test_sample[['scenario', 'msg_size', 'concurrent_users']].values.reshape(-1,3))
-    #     # testY = scalerY.transform(test_sample['residuals'].values.reshape(-1,3))
-    #     testY = test_sample['residuals']
+    results_df = pd.DataFrame({'scenario': test['scenario'], 'msg_size': test['msg_size'], 'concurrent_users': test['concurrent_users'], 'avg_response_time': test['avg_response_time'], 'domain_prediction': test['domain_prediction'],'residuals': testY , 'residual_prediction': predY.flatten(), 'avg_response_time_prediction': pred_response_time})
+    print(results_df)
+    results_df.to_csv('../../models/api_manager/new_model/results/case' + str(i+1) + '.csv', sep=",", index= False)
 
-    #     # predict residual (domain_prediction - latency)
-    #     predY = model.predict(testX)
+    rms_residuals = np.sqrt(np.mean(np.square(test['residuals'])))
+    rms_avg_response_time = np.sqrt(np.mean(np.square(test['avg_response_time'])))
 
-    #     # residual error
-    #     # mae = np.mean(np.abs(testY.values - predY))
-    #     rmse = np.sqrt(np.mean(np.square(testY.values - predY))) #remove .values for minmax scaler
-    #     # mae = np.mean(np.abs(testY.values - predY))
-    #     error.append(rmse)
+    print('loss/val_loss/domain_loss/residual_loss/prediction_loss/', loss, validation_loss, domain_error, residual_error, prediction_loss)
 
-    #     # prediction error (latency)
-    #     # pred_response_time = test_sample['domain_prediction'] - scalerY.inverse_transform(predY).flatten()
-    #     pred_response_time = test_sample['domain_prediction'] - predY.flatten()
-    #     rmse = np.sqrt(np.mean(np.square(test_sample['avg_response_time'].values - pred_response_time)))
-    #     # mae = np.mean(np.abs(test_sample['avg_response_time'].values - pred_response_time))
-    #     pred_error.append(rmse)
+    print('percentage error residuals/ domain/ hybrid', (residual_error/rms_residuals) * 100 , (domain_error/rms_avg_response_time) * 100, (prediction_loss/rms_avg_response_time) * 100)
 
-    #     # print('test sample ', i, ' ', test.shape, test_sample.shape, testY.mean(), mae)
+    return prediction_loss, pred_response_time
 
-    # avg_error = np.mean(error)
-    # print('Residual sample_loss: ', avg_error)
-    # # sample_loss.append(scalerY.inverse_transform(np.array(avg_error).reshape(-1,3))[0,0])
-    # sample_loss = avg_error
+def evaluate_model(i):
+    random.seed(i*2)
+    seed = random.randint(1,100)
+    print('i, seed ', i, seed)
 
-    # avg_error = np.mean(pred_error)
-    # print('Prediction sample_loss: ', avg_error)
-    # sample_prediction_loss = avg_error
-
-
-    print('loss/val_loss/prediction_loss/sample_loss/sample_predction_loss', loss, validation_loss, prediction_loss)
-
-
-def evaluate_model():
+    domain_model_parameters, _ = domain_model.create_model(df, i)
 
     df['domain_prediction'] = domain_model.predict(df[['scenario', 'msg_size', 'concurrent_users']], domain_model_parameters)
     df['residuals'] = df['domain_prediction'] - df['avg_response_time']
 
-    infile = open('../../models/api_manager/4_residual_model/_scalars/scalerX.pkl', 'rb')
+    infile = open('../../models/api_manager/6_residual_model_domainfunc2(test4)/_scalars/scalerX.pkl', 'rb')
     scalerX = pkl.load(infile)
     infile.close()
 
-    (train, test) = train_test_split(df, test_size=0.3, random_state=74)
+    (train, test) = train_test_split(df, test_size=0.3, random_state=seed)
 
-    model = keras.models.load_model('../../models/api_manager/4_residual_model/model', compile=False)
+    model = keras.models.load_model('../../models/api_manager/6_residual_model_domainfunc2(test4)/model', compile=False)
 
 
     # preds for dataset
@@ -141,6 +130,11 @@ def evaluate_model():
     # testY = scalerY.transform(test['residuals'].values.reshape(-1,3))
     testY = test['residuals']
     predY = model.predict(testX)
+
+    domain_error = np.sqrt(np.mean(np.square(test['domain_prediction'] - test['avg_response_time'])))
+    print('domain_error', domain_error)
+    residual_error = np.sqrt(np.mean(np.square(testY.values - predY.flatten())))
+    print('residual_error', residual_error)
 
     # predY = d_latency  - (d_latency - latency)
     # pred_response_time = test['domain_prediction'] - scalerY.inverse_transform(predY).flatten()
@@ -150,8 +144,7 @@ def evaluate_model():
     prediction_loss = rmse
 
     print('\navg_response_time:\n','\n'.join([str(val) for val in test['avg_response_time'].values]))
-    print('\npredicted avg_response_time:\n', '\n'.join([str(val) for val in pred_response_time.values]))
-
+    print('\npredicted avg_response_time by hybrid model:\n', '\n'.join([str(val) for val in pred_response_time.values]))
 
     for msg in [50, 1024, 10240, 102400]:
 
@@ -176,7 +169,7 @@ def evaluate_model():
     plt.ylabel('avg_response_time')
     plt.legend()
     # plt.show()
-    plt.savefig('../../Plots/_api_manager/7_residual_model/msg_size.png')
+    plt.savefig('../../Plots/_api_manager/19_residual_model_test4/' + str(i+1) + '_msg_size.png')
     plt.close()
 
     for scenario_id in [1,2]:
@@ -203,15 +196,25 @@ def evaluate_model():
     plt.ylabel('avg_response_time')
     plt.legend()
     # plt.show()
-    plt.savefig('../../Plots/_api_manager/7_residual_model/scenario.png')
+    plt.savefig('../../Plots/_api_manager/19_residual_model_test4/' + str(i+1) + '_scenario.png')
     plt.close()
 
-    print('prediction_loss/sample_loss/sample_predction_loss', prediction_loss)
+    rms_residuals = np.sqrt(np.mean(np.square(test['residuals'])))
+    rms_avg_response_time = np.sqrt(np.mean(np.square(test['avg_response_time'])))
+
+    results_df = pd.DataFrame({'scenario': test['scenario'], 'msg_size': test['msg_size'], 'concurrent_users': test['concurrent_users'], 'avg_response_time': test['avg_response_time'], 'domain_prediction': test['domain_prediction'],'residuals': testY , 'residual_prediction': predY.flatten(), 'avg_response_time_prediction': pred_response_time})
+    # print(results_df)
+    results_df.to_csv('../../models/api_manager/6_residual_model_domainfunc2(test4)/results/case' + str(i+1) + '.csv', sep=",", index= False)
+
+    print('domain_loss/residual_loss/prediction_loss/', domain_error, residual_error, prediction_loss)
+    print('percentage error domain/ residuals/ hybrid', (domain_error/rms_avg_response_time) * 100, (residual_error/rms_residuals) * 100, (prediction_loss/rms_avg_response_time) * 100)
     
     return prediction_loss
 
 
-def get_residual_model_forecasts():
+def get_residual_model_forecasts(i):
+
+    domain_model_parameters, _ = domain_model.create_model(df, i)
 
     df['domain_prediction'] = domain_model.predict(df[['scenario', 'msg_size', 'concurrent_users']], domain_model_parameters)
     df['residuals'] = df['domain_prediction'] - df['avg_response_time']
@@ -233,6 +236,37 @@ def get_residual_model_forecasts():
 
     return y
 
+def cross_validation():
+    error = []
+    predictions = []
+    
+    for i in range(5):
+        print('\ncase', i+1)
+        rmse, preds = train_model(i)
+        error.append(rmse)
+        predictions.append(preds)
+        print('\n'.join([str(p) for p in predictions[i]]), '\n\n')
+        print('rmse--->', error[i], '\n')
+        print('------------------------')
+
+    print('\n'.join([str(e) for e in error]), '\n\n')
+    print('mean error --->', np.mean(error))
+
+
+def evaluate():
+    error = []
+    
+    for i in range(5):
+        print('\ncase', i+1)
+        rmse = evaluate_model(i)
+        error.append(rmse)
+        print('rmse--->', error[i], '\n')
+        print('------------------------')
+
+    print('\n'.join([str(e) for e in error]), '\n\n')
+    print('mean error --->', np.mean(error))
+
 # train_model()
-evaluate_model()
-# print(get_residual_model_forecasts())
+# evaluate_model(2)
+# cross_validation()
+evaluate()
