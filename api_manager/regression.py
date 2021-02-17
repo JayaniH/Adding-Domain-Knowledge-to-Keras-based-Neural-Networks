@@ -41,13 +41,13 @@ def train_model(i):
     testY = test['avg_response_time']
 
     scalerX = MinMaxScaler()
-    trainX = scalerX.fit_transform(train[['scenario', 'msg_size', 'concurrent_users']].values.reshape(-1,3))
-    testX = scalerX.transform(test[['scenario', 'msg_size', 'concurrent_users']].values.reshape(-1,3))
+    trainX = scalerX.fit_transform(train[['scenario_passthrough', 'scenario_transformation', 'msg_size', 'concurrent_users']].values.reshape(-1,4))
+    testX = scalerX.transform(test[['scenario_passthrough', 'scenario_transformation', 'msg_size', 'concurrent_users']].values.reshape(-1,4))
 
     # save scaler X
-    # outfile = open('../../models/api_manager/3_regression_relu/_scalars/scalerX_' + str(i+1) +'.pkl', 'wb')
-    # pkl.dump(scalerX, outfile)
-    # outfile.close()
+    outfile = open('../../models/api_manager/new_model/_scalars/scalerX_' + str(i+1) +'.pkl', 'wb')
+    pkl.dump(scalerX, outfile)
+    outfile.close()
 
     model = models.create_model(trainX.shape[1])
     opt = Adam(learning_rate=1e-2, decay=1e-3/200)
@@ -57,7 +57,7 @@ def train_model(i):
     history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
     # save model
-    # model.save('../../models/api_manager/3_regression_relu/case' + str(i+1))
+    model.save('../../models/api_manager/new_model/case' + str(i+1))
 
     # get final loss for residual prediction
     # loss.append(scalerY.inverse_transform(np.array(history.history['loss'][-1]).reshape(-1,3))[0,0])
@@ -124,17 +124,17 @@ def evaluate_model(i):
     seed = random.randint(1,100)
     print('i, seed ', i, seed)
 
-    infile = open('../../models/api_manager/3_regression_relu/_scalars/scalerX_' + str(i+1) +'.pkl', 'rb')
+    infile = open('../../models/api_manager/new_model/_scalars/scalerX_' + str(i+1) +'.pkl', 'rb')
     scalerX = pkl.load(infile)
     infile.close()
 
     (train, test) = train_test_split(df, test_size=0.3, random_state=seed)
 
-    model = keras.models.load_model('../../models/api_manager/3_regression_relu/case' + str(i+1), compile=False)
+    model = keras.models.load_model('../../models/api_manager/new_model/case' + str(i+1), compile=False)
 
 
     # preds for dataset
-    testX = scalerX.transform(test[['scenario', 'msg_size', 'concurrent_users']].values.reshape(-1,3))
+    testX = scalerX.transform(test[['scenario_passthrough', 'scenario_transformation', 'msg_size', 'concurrent_users']].values.reshape(-1,4))
     # testY = scalerY.transform(test['avg_response_time'].values.reshape(-1,3))
     testY = test['avg_response_time']
     pred_response_time = model.predict(testX)
@@ -142,59 +142,64 @@ def evaluate_model(i):
     print('\navg_response_time:\n','\n'.join([str(val) for val in testY.values]))
     print('\npredicted avg_response_time:\n', '\n'.join([str(val) for val in pred_response_time.flatten()]))
 
+    results_df = pd.DataFrame({'scenario': test['scenario'], 'msg_size': test['msg_size'], 'concurrent_users': test['concurrent_users'], 'avg_response_time': testY, 'prediction': pred_response_time.flatten()})
+    print(results_df)
+    results_df.to_csv('../../models/api_manager/new_model/results/case' + str(i+1) + '.csv', sep=",", index= False)
+
     rmse = np.sqrt(np.mean(np.square(testY.values - pred_response_time.flatten())))
     # mae = np.mean(np.abs(test['avg_response_time'].values - pred_response_time))
     prediction_loss = rmse
 
+    # forecasting
 
-    for msg in [50, 1024, 10240, 102400]:
+    # for msg in [50, 1024, 10240, 102400]:
 
-        x1 = np.full((1000,), 1)
-        x2 = np.full((1000,), msg)
-        x3 = np.arange(0, 1000, 1)
-        new_df = pd.DataFrame({'scenario': x1, 'msg_size': x2, 'concurrent_users': x3})
-        y = model.predict(scalerX.transform(new_df.values.reshape(-1,3)))
-        y = y.flatten()
-
-
-        df_filtered = df[(df['msg_size'] == msg) & (df['scenario'] == 1)]
-        # plt.yscale('log')
-        plt.plot(x3, y, label='msg_size='+str(msg))
-        plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
-
-    # plt.scatter(df['concurrent_users'], df['avg_response_time'])
-    plt.title('ML Model : scenario = passthrough')
-    plt.xlabel('concurrent_users')
-    plt.ylabel('avg_response_time')
-    plt.legend()
-    # plt.show()
-    # plt.savefig('../../Plots/_api_manager/6_regression/msg_size.png')
-    plt.close()
-
-    for scenario_id in [1,2]:
-
-        scenario = 'passthrough' if scenario_id == 1 else 'transformation'
-        x1 = np.full((1000,), scenario_id)
-        x2 = np.full((1000,), 50)
-        x3 = np.arange(0, 1000, 1)
-        new_df = pd.DataFrame({'scenario': x1, 'msg_size': x2, 'concurrent_users': x3})
-        y = model.predict(scalerX.transform(new_df.values.reshape(-1,3)))
-        y = y.flatten()
+    #     x1 = np.full((1000,), 1)
+    #     x2 = np.full((1000,), msg)
+    #     x3 = np.arange(0, 1000, 1)
+    #     new_df = pd.DataFrame({'scenario': x1, 'msg_size': x2, 'concurrent_users': x3})
+    #     y = model.predict(scalerX.transform(new_df.values.reshape(-1,3)))
+    #     y = y.flatten()
 
 
-        df_filtered = df[(df['scenario'] == scenario_id) & (df['msg_size'] == 50)]
-        # plt.yscale('log')
-        plt.plot(x3, y, label='scenario='+str(scenario))
-        plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
+    #     df_filtered = df[(df['msg_size'] == msg) & (df['scenario'] == 1)]
+    #     # plt.yscale('log')
+    #     plt.plot(x3, y, label='msg_size='+str(msg))
+    #     plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
 
-    # plt.scatter(df['concurrent_users'], df['avg_response_time'])
-    plt.title('ML Model : msg_size = 50')
-    plt.xlabel('concurrent_users')
-    plt.ylabel('avg_response_time')
-    plt.legend()
-    # plt.show()
-    # plt.savefig('../../Plots/_api_manager/6_regression/scenario.png')
-    plt.close()
+    # # plt.scatter(df['concurrent_users'], df['avg_response_time'])
+    # plt.title('ML Model : scenario = passthrough')
+    # plt.xlabel('concurrent_users')
+    # plt.ylabel('avg_response_time')
+    # plt.legend()
+    # # plt.show()
+    # # plt.savefig('../../Plots/_api_manager/6_regression/msg_size.png')
+    # plt.close()
+
+    # for scenario_id in [1,2]:
+
+    #     scenario = 'passthrough' if scenario_id == 1 else 'transformation'
+    #     x1 = np.full((1000,), scenario_id)
+    #     x2 = np.full((1000,), 50)
+    #     x3 = np.arange(0, 1000, 1)
+    #     new_df = pd.DataFrame({'scenario': x1, 'msg_size': x2, 'concurrent_users': x3})
+    #     y = model.predict(scalerX.transform(new_df.values.reshape(-1,3)))
+    #     y = y.flatten()
+
+
+    #     df_filtered = df[(df['scenario'] == scenario_id) & (df['msg_size'] == 50)]
+    #     # plt.yscale('log')
+    #     plt.plot(x3, y, label='scenario='+str(scenario))
+    #     plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
+
+    # # plt.scatter(df['concurrent_users'], df['avg_response_time'])
+    # plt.title('ML Model : msg_size = 50')
+    # plt.xlabel('concurrent_users')
+    # plt.ylabel('avg_response_time')
+    # plt.legend()
+    # # plt.show()
+    # # plt.savefig('../../Plots/_api_manager/6_regression/scenario.png')
+    # plt.close()
 
     print('prediction_loss/sample_loss/sample_predction_loss', prediction_loss, '\n')
     
@@ -235,7 +240,7 @@ def cross_validation():
     print('mean error --->', np.mean(error))
 
 
-def evalate():
+def evaluate():
     error = []
     
     for i in range(5):
@@ -251,5 +256,5 @@ def evalate():
 
 # train_model()
 # evaluate_model()
-cross_validation()
-# evalate()
+# cross_validation()
+evaluate()
