@@ -5,6 +5,7 @@ def truncate_dataset(infile, outfile):
     df = pd.read_csv(infile, sep=",")
     df = df[['Scenario Name', 'Concurrent Users', 'Message Size (Bytes)', 'Average Response Time (ms)']]
     df = df.rename(columns={'Scenario Name': 'scenario', 'Concurrent Users': 'concurrent_users', 'Message Size (Bytes)': 'msg_size', 'Average Response Time (ms)': 'avg_response_time'})
+    df = df[df['avg_response_time'] < 180000]
     print(df)
     df.to_csv(outfile, sep=",", index= False)
 
@@ -117,8 +118,8 @@ def plot_as_categories(file):
     # plt.savefig('../../Plots/_api_manager/13_domain_model_minimization_regularization_upper_mean_5std_lower_mean_01std/' + str(i+1) + '_scenario.png')
     plt.close()
 
-# truncate_dataset('summary.csv', 'summary_truncated.csv')
-# categorical_to_numerical('summary_truncated.csv')
+truncate_dataset('summary.csv', 'summary_truncated.csv')
+categorical_to_numerical('summary_truncated.csv')
 # group_and_plot('summary_truncated.csv')
 # summarize('summary_truncated.csv')
 # plot_as_categories('summary_truncated.csv')

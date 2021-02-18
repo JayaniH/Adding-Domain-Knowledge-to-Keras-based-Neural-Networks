@@ -23,7 +23,7 @@ def cost(params, X, y_true):
     loss = np.sqrt(np.mean(np.square(y_pred - y_true)))
     # print('loss/regularization--->', loss, regularization)
 
-    return loss + regularization
+    return loss #+ regularization
 
 
 def create_model(df, i):
