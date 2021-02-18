@@ -5,7 +5,8 @@ from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 import models
-import domain_model
+# import domain_model
+import domain_model_usl as domain_model
 import numpy as np
 import pandas as pd
 import pickle as pkl
@@ -34,7 +35,7 @@ def train_model(i):
 
     domain_model_parameters, _ = domain_model.create_model(df, i)
     
-    df['domain_prediction'] = domain_model.predict(df[['scenario', 'msg_size', 'concurrent_users']], domain_model_parameters)
+    df['domain_prediction'] = domain_model.predict(df['concurrent_users'], domain_model_parameters)
     df['residuals'] = df['domain_prediction'] - df['avg_response_time']
 
     print('[INFO] constructing training/testing split...')
@@ -48,8 +49,8 @@ def train_model(i):
     testY = test['residuals']
 
     scalerX = MinMaxScaler()
-    trainX = scalerX.fit_transform(train[['scenario', 'msg_size', 'concurrent_users']].values.reshape(-1,3))
-    testX = scalerX.transform(test[['scenario', 'msg_size', 'concurrent_users']].values.reshape(-1,3))
+    trainX = scalerX.fit_transform(train[['scenario_passthrough', 'scenario_transformation', 'msg_size', 'concurrent_users']].values.reshape(-1,4))
+    testX = scalerX.transform(test[['scenario_passthrough', 'scenario_transformation', 'msg_size', 'concurrent_users']].values.reshape(-1,4))
 
     # save scaler X
     outfile = open('../../models/api_manager/new_model/_scalars/scalerX.pkl', 'wb')
@@ -61,7 +62,7 @@ def train_model(i):
     model.compile(loss=root_mean_squared_error, optimizer=opt)
 
     print('[INFO] training model...')
-    history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=300, batch_size=4)
+    history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
     # save model
     model.save('../../models/api_manager/new_model/model')
@@ -113,20 +114,20 @@ def evaluate_model(i):
 
     domain_model_parameters, _ = domain_model.create_model(df, i)
 
-    df['domain_prediction'] = domain_model.predict(df[['scenario', 'msg_size', 'concurrent_users']], domain_model_parameters)
+    df['domain_prediction'] = domain_model.predict(df['concurrent_users'], domain_model_parameters)
     df['residuals'] = df['domain_prediction'] - df['avg_response_time']
 
-    infile = open('../../models/api_manager/6_residual_model_domainfunc2(test4)/_scalars/scalerX.pkl', 'rb')
+    infile = open('../../models/api_manager/new_model/_scalars/scalerX.pkl', 'rb')
     scalerX = pkl.load(infile)
     infile.close()
 
     (train, test) = train_test_split(df, test_size=0.3, random_state=seed)
 
-    model = keras.models.load_model('../../models/api_manager/6_residual_model_domainfunc2(test4)/model', compile=False)
+    model = keras.models.load_model('../../models/api_manager/new_model/model', compile=False)
 
 
     # preds for dataset
-    testX = scalerX.transform(test[['scenario', 'msg_size', 'concurrent_users']].values.reshape(-1,3))
+    testX = scalerX.transform(test[['scenario_passthrough', 'scenario_transformation', 'msg_size', 'concurrent_users']].values.reshape(-1,4))
     # testY = scalerY.transform(test['residuals'].values.reshape(-1,3))
     testY = test['residuals']
     predY = model.predict(testX)
@@ -139,6 +140,10 @@ def evaluate_model(i):
     # predY = d_latency  - (d_latency - latency)
     # pred_response_time = test['domain_prediction'] - scalerY.inverse_transform(predY).flatten()
     pred_response_time = test['domain_prediction'] - predY.flatten()
+
+    # remove negative preds
+    # pred_response_time = np.maximum(0.0, pred_response_time)
+
     rmse = np.sqrt(np.mean(np.square(test['avg_response_time'].values - pred_response_time)))
     # mae = np.mean(np.abs(test['avg_response_time'].values - pred_response_time))
     prediction_loss = rmse
@@ -146,65 +151,67 @@ def evaluate_model(i):
     print('\navg_response_time:\n','\n'.join([str(val) for val in test['avg_response_time'].values]))
     print('\npredicted avg_response_time by hybrid model:\n', '\n'.join([str(val) for val in pred_response_time.values]))
 
-    for msg in [50, 1024, 10240, 102400]:
+    # # forecasting
 
-        x1 = np.full((1000,), 1)
-        x2 = np.full((1000,), msg)
-        x3 = np.arange(0, 1000, 1)
-        new_df = pd.DataFrame({'scenario': x1, 'msg_size': x2, 'concurrent_users': x3})
-        domain_prediction = domain_model.predict(new_df, domain_model_parameters)
-        y = model.predict(scalerX.transform(new_df.values.reshape(-1,3)))
-        # y = domain_prediction - scalerY.inverse_transform(y).flatten()
-        y = domain_prediction - y.flatten()
+    # for msg in [50, 1024, 10240, 102400]:
 
-
-        df_filtered = df[(df['msg_size'] == msg) & (df['scenario'] == 1)]
-        # plt.yscale('log')
-        plt.plot(x3, y, label='msg_size='+str(msg))
-        plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
-
-    # plt.scatter(df['concurrent_users'], df['avg_response_time'])
-    plt.title('Residual Model : scenario = passthrough')
-    plt.xlabel('concurrent_users')
-    plt.ylabel('avg_response_time')
-    plt.legend()
-    # plt.show()
-    plt.savefig('../../Plots/_api_manager/19_residual_model_test4/' + str(i+1) + '_msg_size.png')
-    plt.close()
-
-    for scenario_id in [1,2]:
-
-        scenario = 'passthrough' if scenario_id == 1 else 'transformation'
-        x1 = np.full((1000,), scenario_id)
-        x2 = np.full((1000,), 50)
-        x3 = np.arange(0, 1000, 1)
-        new_df = pd.DataFrame({'scenario': x1, 'msg_size': x2, 'concurrent_users': x3})
-        domain_prediction = domain_model.predict(new_df, domain_model_parameters)
-        y = model.predict(scalerX.transform(new_df.values.reshape(-1,3)))
-        # y = domain_prediction - scalerY.inverse_transform(y).flatten()
-        y = domain_prediction - y.flatten()
+    #     x1 = np.full((1000,), 1)
+    #     x2 = np.full((1000,), msg)
+    #     x3 = np.arange(0, 1000, 1)
+    #     new_df = pd.DataFrame({'scenario': x1, 'msg_size': x2, 'concurrent_users': x3})
+    #     domain_prediction = domain_model.predict(new_df, domain_model_parameters)
+    #     y = model.predict(scalerX.transform(new_df.values.reshape(-1,3)))
+    #     # y = domain_prediction - scalerY.inverse_transform(y).flatten()
+    #     y = domain_prediction - y.flatten()
 
 
-        df_filtered = df[(df['scenario'] == scenario_id) & (df['msg_size'] == 50)]
-        # plt.yscale('log')
-        plt.plot(x3, y, label='scenario='+str(scenario))
-        plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
+    #     df_filtered = df[(df['msg_size'] == msg) & (df['scenario'] == 1)]
+    #     # plt.yscale('log')
+    #     plt.plot(x3, y, label='msg_size='+str(msg))
+    #     plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
 
-    # plt.scatter(df['concurrent_users'], df['avg_response_time'])
-    plt.title('Residual Model : msg_size = 50')
-    plt.xlabel('concurrent_users')
-    plt.ylabel('avg_response_time')
-    plt.legend()
-    # plt.show()
-    plt.savefig('../../Plots/_api_manager/19_residual_model_test4/' + str(i+1) + '_scenario.png')
-    plt.close()
+    # # plt.scatter(df['concurrent_users'], df['avg_response_time'])
+    # plt.title('Residual Model : scenario = passthrough')
+    # plt.xlabel('concurrent_users')
+    # plt.ylabel('avg_response_time')
+    # plt.legend()
+    # # plt.show()
+    # # plt.savefig('../../Plots/_api_manager/19_residual_model_test4/' + str(i+1) + '_msg_size.png')
+    # plt.close()
+
+    # for scenario_id in [1,2]:
+
+    #     scenario = 'passthrough' if scenario_id == 1 else 'transformation'
+    #     x1 = np.full((1000,), scenario_id)
+    #     x2 = np.full((1000,), 50)
+    #     x3 = np.arange(0, 1000, 1)
+    #     new_df = pd.DataFrame({'scenario': x1, 'msg_size': x2, 'concurrent_users': x3})
+    #     domain_prediction = domain_model.predict(new_df, domain_model_parameters)
+    #     y = model.predict(scalerX.transform(new_df.values.reshape(-1,3)))
+    #     # y = domain_prediction - scalerY.inverse_transform(y).flatten()
+    #     y = domain_prediction - y.flatten()
+
+
+    #     df_filtered = df[(df['scenario'] == scenario_id) & (df['msg_size'] == 50)]
+    #     # plt.yscale('log')
+    #     plt.plot(x3, y, label='scenario='+str(scenario))
+    #     plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
+
+    # # plt.scatter(df['concurrent_users'], df['avg_response_time'])
+    # plt.title('Residual Model : msg_size = 50')
+    # plt.xlabel('concurrent_users')
+    # plt.ylabel('avg_response_time')
+    # plt.legend()
+    # # plt.show()
+    # plt.savefig('../../Plots/_api_manager/19_residual_model_test4/' + str(i+1) + '_scenario.png')
+    # plt.close()
 
     rms_residuals = np.sqrt(np.mean(np.square(test['residuals'])))
     rms_avg_response_time = np.sqrt(np.mean(np.square(test['avg_response_time'])))
 
     results_df = pd.DataFrame({'scenario': test['scenario'], 'msg_size': test['msg_size'], 'concurrent_users': test['concurrent_users'], 'avg_response_time': test['avg_response_time'], 'domain_prediction': test['domain_prediction'],'residuals': testY , 'residual_prediction': predY.flatten(), 'avg_response_time_prediction': pred_response_time})
     # print(results_df)
-    results_df.to_csv('../../models/api_manager/6_residual_model_domainfunc2(test4)/results/case' + str(i+1) + '.csv', sep=",", index= False)
+    results_df.to_csv('../../models/api_manager/new_model/results/case' + str(i+1) + '.csv', sep=",", index= False)
 
     print('domain_loss/residual_loss/prediction_loss/', domain_error, residual_error, prediction_loss)
     print('percentage error domain/ residuals/ hybrid', (domain_error/rms_avg_response_time) * 100, (residual_error/rms_residuals) * 100, (prediction_loss/rms_avg_response_time) * 100)
@@ -216,7 +223,7 @@ def get_residual_model_forecasts(i):
 
     domain_model_parameters, _ = domain_model.create_model(df, i)
 
-    df['domain_prediction'] = domain_model.predict(df[['scenario', 'msg_size', 'concurrent_users']], domain_model_parameters)
+    df['domain_prediction'] = domain_model.predict(df['concurrent_users'], domain_model_parameters)
     df['residuals'] = df['domain_prediction'] - df['avg_response_time']
 
     infile = open('../../models/api_manager/4_residual_model/_scalars/scalerX.pkl', 'rb')
