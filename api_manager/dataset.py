@@ -5,7 +5,7 @@ def truncate_dataset(infile, outfile):
     df = pd.read_csv(infile, sep=",")
     df = df[['Scenario Name', 'Concurrent Users', 'Message Size (Bytes)', 'Average Response Time (ms)']]
     df = df.rename(columns={'Scenario Name': 'scenario', 'Concurrent Users': 'concurrent_users', 'Message Size (Bytes)': 'msg_size', 'Average Response Time (ms)': 'avg_response_time'})
-    df = df[df['avg_response_time'] < 180000]
+    # df = df[df['avg_response_time'] < 180000]
     print(df)
     df.to_csv(outfile, sep=",", index= False)
 

@@ -23,7 +23,7 @@ def cost(params, X, y_true):
     loss = np.sqrt(np.mean(np.square(y_pred - y_true)))
     # print('loss/regularization--->', loss, regularization)
 
-    return loss #+ regularization
+    return loss + regularization
 
 
 def create_model(df, i):
@@ -43,7 +43,7 @@ def create_model(df, i):
     predY = f(test['concurrent_users'], s, k, l)
     rmse = np.sqrt(np.mean(np.square(predY - test['avg_response_time'])))
     print('\navg_response_time:\n','\n'.join([str(val) for val in test['avg_response_time'].values]))
-    print('\npredicted avg_response_time:\n', '\n'.join([str(val) for val in predY.values]))
+    print('\npredicted avg_response_time by USL domain model:\n', '\n'.join([str(val) for val in predY.values]))
     print('RMSE -> ', rmse)
 
     results_df = pd.DataFrame({'scenario': test['scenario'], 'msg_size': test['msg_size'], 'concurrent_users': test['concurrent_users'], 'avg_response_time': test['avg_response_time'], 'prediction': predY})
