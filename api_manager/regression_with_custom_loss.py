@@ -27,7 +27,7 @@ def custom_loss(y, y_pred):
     # y_true=K.print_tensor(y_true)
     # domain_latency=K.print_tensor(domain_latency)
 
-    return K.sqrt(K.mean(K.square(y_pred - y_true))) +  (0.001 * K.sqrt(K.mean(K.square(domain_prediction - y_pred))))
+    return K.sqrt(K.mean(K.square(y_pred - y_true))) +  (1 * K.sqrt(K.mean(K.square(domain_prediction - y_pred))))
 
 # results_file = open('./results/residual_results.txt', 'w')
 
@@ -157,7 +157,7 @@ def evaluate_model(i):
     pred_response_time = model.predict(testX)
 
     print('\navg_response_time:\n','\n'.join([str(val) for val in test['avg_response_time'].values]))
-    print('\npredicted avg_response_time by ml model with domain regularization:\n', '\n'.join([str(val) for val in pred_response_time.flatten()]))
+    print('\npredicted avg_response_time by ml model with custom loss:\n', '\n'.join([str(val) for val in pred_response_time.flatten()]))
 
     results_df = pd.DataFrame({'scenario': test['scenario'], 'msg_size': test['msg_size'], 'concurrent_users': test['concurrent_users'], 'avg_response_time': test['avg_response_time'], 'prediction': pred_response_time.flatten()})
     print(results_df)
