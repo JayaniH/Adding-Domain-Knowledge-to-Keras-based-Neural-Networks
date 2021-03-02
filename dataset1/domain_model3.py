@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 import datasets
 
+# domain model using curve fit
+
 
 # USL equation
 def USL(n, s, k, l):
@@ -21,7 +23,9 @@ def fit_parameters_and_evaluate():
     sample_loss = []
     loss = []
     equation_params = []
-    EPSILON =  1e-6
+    estimate_s = []
+    estimate_k = []
+    estimate_l = []
 
     # results_file = open("./results/domain_results.txt", "w")
 
@@ -46,6 +50,9 @@ def fit_parameters_and_evaluate():
 
         equation_params.append(params)
         [s, k, l] = params
+        estimate_s.append(s)
+        estimate_k.append(k)
+        estimate_l.append(l)
 
 
         # evaluation using bucket method
@@ -89,12 +96,12 @@ def fit_parameters_and_evaluate():
         print("Loss: ", rmse)
         loss.append(rmse)
 
-        x = np.arange(0, group.wip.max() +0.1 , 0.01)
+        x = np.arange(0, group["wip"].max() +0.1 , 0.01)
         y = USL(x, s, k, l)
         # domain_model_predictions[name] = y
 
         # plt.yscale("log")
-        plt.scatter(group.wip, group.latency)
+        plt.scatter(group["wip"], group["latency"])
         plt.plot(x, y, 'y', label='domain')
         plt.title('[curve_fit]\n'+name)
         plt.xlabel('wip')
@@ -112,10 +119,20 @@ def fit_parameters_and_evaluate():
     median_sample_loss = np.percentile(sample_loss, 50)
     percentile_sample_loss = np.percentile(sample_loss, 95)
 
-    print("-------Domain Model--------")
+    print("-------Domain Model Results--------\n")
+    print("Parameter Estimates\n")
     print("\n".join([str(l) for l in equation_params]), "\n\n")
 
+    print("Parameter Estimates - Sigma(s)\n")
+    print("\n".join([str(s) for s in estimate_s]), "\n\n")
+    print("Parameter Estimates - Kappa(k)\n")
+    print("\n".join([str(k) for k in estimate_k]), "\n\n")
+    print("Parameter Estimates - Lambda(l)\n")
+    print("\n".join([str(l) for l in estimate_l]), "\n\n")
+
+    print("Prediction Error\n")
     print("\n".join([str(l) for l in loss]), "\n\n")
+    print("Prediction Error (bucket sampling)\n")
     print("\n".join([str(l) for l in sample_loss]), "\n\n")
 
     print("Mean loss/sample_loss", mean_loss, mean_sample_loss)
@@ -144,7 +161,7 @@ def get_domain_forecasts():
     parameters = fit_parameters_and_evaluate()
     for name, group in df:
         group = datasets.remove_outliers(group)
-        x = np.arange(0, group.wip.max() +0.1 , 0.01)
+        x = np.arange(0, group["wip"].max() +0.1 , 0.01)
         y = predict(name, x, parameters[name])
         domain_model_predictions[name] = y
         # print(x.shape, y.shape)

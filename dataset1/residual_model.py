@@ -71,7 +71,7 @@ def train_models():
         # testY = scalerY.transform(test["residuals"].values.reshape(-1,1))
 
         # # save scaler Y
-        # outfile = open("../models/residual_models_rmse/_scalars/scalerY" + name.replace("/", "_") + ".pkl", "wb")
+        # outfile = open("../../models/residual_models_rmse/_scalars/scalerY" + name.replace("/", "_") + ".pkl", "wb")
         # pkl.dump(scalerY, outfile)
         # outfile.close()
 
@@ -83,7 +83,7 @@ def train_models():
         testX = scalerX.transform(test["wip"].values.reshape(-1,1))
 
         # save scaler X
-        outfile = open("../models/10_residual_rmse/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "wb")
+        outfile = open("../../models/53_residual_model_small_sample/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "wb")
         pkl.dump(scalerX, outfile)
         outfile.close()
 
@@ -95,7 +95,7 @@ def train_models():
         history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
         # save model
-        model.save('../models/10_residual_rmse/' + name.replace("/", "_"))
+        model.save('../../models/53_residual_model_small_sample/' + name.replace("/", "_"))
 
         # get final loss for residual prediction
         # loss.append(scalerY.inverse_transform(np.array(history.history['loss'][-1]).reshape(-1,1))[0,0])
@@ -178,15 +178,20 @@ def train_models():
     percentile_sample_loss = np.percentile(sample_loss, 95)
     percentile_sample_prediction_loss = np.percentile(sample_prediction_loss, 95)
 
+    print("training loss\n")
     print("\n".join([str(l) for l in loss]), "\n\n")
+    print("validation loss\n")
     print("\n".join([str(l) for l in validation_loss]), "\n\n")
-    print("\n".join([str(l) for l in prediction_loss]), "\n\n")
+    print("bucket sampling\n")
     print("\n".join([str(l) for l in sample_loss]), "\n\n")
+    print("prediction error\n")
+    print("\n".join([str(l) for l in prediction_loss]), "\n\n")
+    print("prediction error (bucket sampling)\n")
     print("\n".join([str(l) for l in sample_prediction_loss]), "\n\n")
 
-    print("Mean loss/val_loss/prediction_loss/sample_loss/sample_predction_loss", mean_loss, mean_val_loss, mean_prediction_loss, mean_sample_loss, mean_sample_prediction_loss)
-    print("Median loss/val_loss/prediction_loss/sample_loss/sample_prediction_loss", median_loss, median_val_loss, median_prediction_loss, median_sample_loss, median_sample_prediction_loss)
-    print("95th percentile loss/val_loss/prediction_loss/sample_loss/sample_prediction_loss", percentile_loss, percentile_val_loss, percentile_prediction_loss, percentile_sample_loss, percentile_sample_prediction_loss)
+    print("Mean loss/val_loss/sample_loss/prediction_loss/sample_predction_loss", mean_loss, mean_val_loss, mean_sample_loss, mean_prediction_loss, mean_sample_prediction_loss)
+    print("Median loss/val_loss/sample_loss/prediction_loss//sample_prediction_loss", median_loss, median_val_loss, median_sample_loss, median_prediction_loss, median_sample_prediction_loss)
+    print("95th percentile loss/val_loss/sample_loss/prediction_loss//sample_prediction_loss", percentile_loss, percentile_val_loss, percentile_sample_loss, percentile_prediction_loss, percentile_sample_prediction_loss)
 
     # results_file.write(str(loss)) 
 
@@ -209,7 +214,7 @@ def evaluate_models():
         group["domain_latency"] = domain_model.predict(name, group["wip"], domain_model_parameters[name])
         group["residuals"] = group["domain_latency"] - group["latency"]
 
-        infile = open("../models/10_residual_rmse/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../../models/53_residual_model_small_sample/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
         scalerX = pkl.load(infile)
         infile.close()
 
@@ -219,7 +224,7 @@ def evaluate_models():
 
         (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
-        model = keras.models.load_model('../models/10_residual_rmse/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../../models/53_residual_model_small_sample/' + name.replace("/", "_"), compile=False)
 
         # preds for regression curve
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
@@ -292,7 +297,7 @@ def evaluate_models():
         plt.ylabel('latency')
         plt.legend()
         # plt.show()
-        plt.savefig('../Plots/residual_actual_domain/' + name.replace("/", "_") + '_loss.png')
+        # plt.savefig('../../Plots/residual_actual_domain/' + name.replace("/", "_") + '_loss.png')
         plt.close()
 
     mean_prediction_loss = np.mean(prediction_loss)
@@ -307,13 +312,16 @@ def evaluate_models():
     percentile_sample_loss = np.percentile(sample_loss, 95)
     percentile_sample_prediction_loss = np.percentile(sample_prediction_loss, 95)
 
-    print("\n".join([str(l) for l in prediction_loss]), "\n\n")
+    print("residual error (bucket sampling)\n")
     print("\n".join([str(l) for l in sample_loss]), "\n\n")
+    print("prediction error\n")
+    print("\n".join([str(l) for l in prediction_loss]), "\n\n")
+    print("prediction error (bucket sampling)\n")
     print("\n".join([str(l) for l in sample_prediction_loss]), "\n\n")
 
-    print("Mean prediction_loss/sample_loss/sample_predction_loss", mean_prediction_loss, mean_sample_loss, mean_sample_prediction_loss)
-    print("Median prediction_loss/sample_loss/sample_prediction_loss", median_prediction_loss, median_sample_loss, median_sample_prediction_loss)
-    print("95th percentile prediction_loss/sample_loss/sample_prediction_loss", percentile_prediction_loss, percentile_sample_loss, percentile_sample_prediction_loss)
+    print("Mean sample_loss/prediction_loss/sample_predction_loss", mean_sample_loss, mean_prediction_loss, mean_sample_prediction_loss)
+    print("Median sample_loss/prediction_loss/sample_prediction_loss", median_sample_loss, median_prediction_loss, median_sample_prediction_loss)
+    print("95th percentile sample_loss/prediction_loss/sample_prediction_loss", percentile_sample_loss, percentile_prediction_loss, percentile_sample_prediction_loss)
 
     return residual_models_predictions
 
@@ -327,11 +335,11 @@ def get_residual_model_forecasts():
         group["domain_latency"] = domain_model.predict(name, group["wip"], domain_model_parameters[name])
         group["residuals"] = group["domain_latency"] - group["latency"]
 
-        infile = open("../models/10_residual_rmse/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../../models/10_residual_rmse/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
         scalerX = pkl.load(infile)
         infile.close()
 
-        model = keras.models.load_model('../models/10_residual_rmse/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../../models/10_residual_rmse/' + name.replace("/", "_"), compile=False)
 
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
         domain_latency = domain_model.predict(name, x, domain_model_parameters[name])
@@ -345,4 +353,4 @@ def get_residual_model_forecasts():
     return residual_models_predictions
 
 # train_models()
-# evaluate_models()
+evaluate_models()

@@ -39,7 +39,6 @@ def fit_parameters_and_evaluate():
     estimate_s = []
     estimate_k = []
     estimate_l = []
-    EPSILON =  1e-6
 
     # results_file = open("./results/domain_results.txt", "w")
 
@@ -133,7 +132,7 @@ def fit_parameters_and_evaluate():
 
     print("-------Domain Model--------")
 
-    print(estimate_s, estimate_k, estimate_l)
+    # print(estimate_s, estimate_k, estimate_l)
 
     print("\n".join([str(s) for s in estimate_s]), "\n\n")
     print("\n".join([str(k) for k in estimate_k]), "\n\n")

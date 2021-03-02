@@ -29,6 +29,8 @@ test_apis = [
 top_5_preds_domain = {}
 test_preds_domain ={}
 
+# domain model with polyfit (parameters restricted)
+
 def fit_with_2deg_up_polynomial_regression_improved(x,y):
     coeffients = np.polyfit(x, y, 2)
     if coeffients[0] < 0:
