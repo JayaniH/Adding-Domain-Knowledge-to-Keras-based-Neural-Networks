@@ -27,34 +27,34 @@ def cost(params, X, y_true):
 
 def create_model(df, train, test, i):
 
-    params, cov = curve_fit(f, train['concurrent_users'], train['avg_latency'], bounds=([0,0,0],[np.inf,10,np.inf]))
-    # result = minimize(cost, [0,0,1], args=(train['concurrent_users'], train['avg_latency']), bounds=((0, np.inf), (0, np.inf), (0.00000001, np.inf)))
+    params, cov = curve_fit(f, train['concurrent_users'], train['mid_latency'], bounds=([0,0,0],[np.inf,10,np.inf]))
+    # result = minimize(cost, [0,0,1], args=(train['concurrent_users'], train['mid_latency']), bounds=((0, np.inf), (0, np.inf), (0.00000001, np.inf)))
     # print('result', result)
     print('params--->', params)
     [s, k, l] = params
     predY = f(test['concurrent_users'], s, k, l)
 
-    rmse = np.sqrt(np.mean(np.square(predY - test['avg_latency'])))
-    mae = np.mean(np.abs(predY - test['avg_latency']))
-    mape = np.mean(np.abs((predY - test['avg_latency'])/test['avg_latency']))*100 
+    rmse = np.sqrt(np.mean(np.square(predY - test['mid_latency'])))
+    mae = np.mean(np.abs(predY - test['mid_latency']))
+    mape = np.mean(np.abs((predY - test['mid_latency'])/test['mid_latency']))*100 
 
-    print('\nlatency:\n','\n'.join([str(val) for val in test['avg_latency'].values]))
+    print('\nlatency:\n','\n'.join([str(val) for val in test['mid_latency'].values]))
     print('\npredicted latency by USL domain model:\n', '\n'.join([str(val) for val in predY.values]))
     
     print('[INFO] rmse/mae/mape...', rmse, mae, mape, '\n')
 
-    # results_df = pd.DataFrame({'concurrent_users': test['concurrent_users'], 'cores': test['cores'], 'workload_mix': test['workload_mix'], 'avg_latency': test['avg_latency'], 'prediction': predY})
+    # results_df = pd.DataFrame({'concurrent_users': test['concurrent_users'], 'cores': test['cores'], 'workload_mix': test['workload_mix'], 'mid_latency': test['mid_latency'], 'prediction': predY})
     # print(results_df)
 
     x = np.arange(0, 200, 1)
     y = f(x, s, k, l)
     # print(y)
-    plt.scatter(train['concurrent_users'], train['avg_latency'], label='actual data')
+    plt.scatter(train['concurrent_users'], train['mid_latency'], label='actual data')
     plt.plot(x, y, label='forecast')
 
     plt.title('[curve_fit]\nDomain Model')
     plt.xlabel('concurrent_users')
-    plt.ylabel('avg_latency')
+    plt.ylabel('mid_latency')
     plt.legend()
     # plt.show()
     # plt.savefig('../../Plots/_api_manager/18_domain_model_minimization_eq2_regularization_param_10000a_100b_10a1/' + str(i+1) + '_cores.png')
@@ -74,7 +74,7 @@ def get_average_error():
     df = pd.read_csv('tpcw_concurrency.csv', sep=',')
     
     print('[INFO] constructing k fold split...')
-    kf = KFold(n_splits=10, shuffle = True, random_state=14)
+    kf = KFold(n_splits=5, shuffle = True, random_state=14)
     i = 0
 
     for train_i, test_i in kf.split(df):
