@@ -34,7 +34,7 @@ def train_model(train_i, test_i, i):
     testX = scalerX.transform(test[['concurrent_users', 'cores', 'workload_mix']].values.reshape(-1,3))
 
     # save scaler X
-    outfile = open('../../models/tcpw/new_model/_scalars/scalerX_' + str(i+1) +'.pkl', 'wb')
+    outfile = open('../../models/tpcw/new_model/_scalars/scalerX_' + str(i+1) +'.pkl', 'wb')
     pkl.dump(scalerX, outfile)
     outfile.close()
 
@@ -46,7 +46,7 @@ def train_model(train_i, test_i, i):
     history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
     # save model
-    model.save('../../models/tcpw/new_model/K' + str(i+1))
+    model.save('../../models/tpcw/new_model/K' + str(i+1))
 
     loss = history.history['loss'][-1]
     validation_loss = history.history['val_loss'][-1]
@@ -66,14 +66,14 @@ def train_model(train_i, test_i, i):
 
 def evaluate_model(train_i, test_i, i):
 
-    infile = open('../../models/tcpw/new_model/_scalars/scalerX_' + str(i+1) +'.pkl', 'rb')
+    infile = open('../../models/tpcw/new_model/_scalars/scalerX_' + str(i+1) +'.pkl', 'rb')
     scalerX = pkl.load(infile)
     infile.close()
 
     train = df.iloc[train_i]
     test = df.iloc[test_i]
 
-    model = keras.models.load_model('../../models/tcpw/new_model/K' + str(i+1), compile=False)
+    model = keras.models.load_model('../../models/tpcw/new_model/K' + str(i+1), compile=False)
 
     # preds for dataset
     testX = scalerX.transform(test[['concurrent_users', 'cores', 'workload_mix']].values.reshape(-1,3))
@@ -86,7 +86,7 @@ def evaluate_model(train_i, test_i, i):
 
     results_df = pd.DataFrame({'concurrent_users': test['concurrent_users'], 'cores': test['cores'], 'workload_mix': test['workload_mix'], 'latency': testY, 'prediction': pred_response_time.flatten()})
     print(results_df)
-    results_df.to_csv('../../models/tcpw/new_model/results/case' + str(i+1) + '.csv', sep=",", index= False)
+    results_df.to_csv('../../models/tpcw/new_model/results/case' + str(i+1) + '.csv', sep=",", index= False)
 
     rmse = np.sqrt(np.mean(np.square(testY.values - pred_response_time.flatten())))
     mae = np.mean(np.abs(testY.values - pred_response_time.flatten()))
@@ -97,7 +97,7 @@ def evaluate_model(train_i, test_i, i):
     return rmse, mae, mape
 
 
-def cross_validation():
+def train_with_cross_validation():
     prediction_error = []
 
     print('[INFO] constructing k fold split...')
@@ -114,7 +114,7 @@ def cross_validation():
     print('\n'.join([str(e) for e in prediction_error]), '\n\n')
     print('mean error --->', np.mean(prediction_error))
 
-def evaluate():
+def evaluate_with_cross_validation():
     error_rmse = []
     error_mae = []
     error_mape = []
@@ -145,5 +145,5 @@ def evaluate():
     print('\n'.join([str(e) for e in error_mape]), '\n')
     print('mean mape --->', np.mean(error_mape), '\n\n')
 
-cross_validation()
-# evaluate()
+train_with_cross_validation()
+# evaluate_with_cross_validation()
