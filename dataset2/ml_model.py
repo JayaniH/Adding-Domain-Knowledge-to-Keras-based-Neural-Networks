@@ -5,6 +5,7 @@ from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 import models
+import _helpers
 import numpy as np
 import pandas as pd
 import pickle as pkl
@@ -13,12 +14,6 @@ import random
 
 def root_mean_squared_error(y_true, y_pred):
     return K.sqrt(K.mean(K.square(y_pred - y_true)))
-
-def root_mean_squared_percentage_error(y_true, y_pred):
-    EPSILON =  1e-6
-    return (K.sqrt(K.mean(K.square((y_true - y_pred) / (y_true + EPSILON))))) * 100
-
-# results_file = open('./results/residual_results.txt', 'w')
 
 # load data
 print('[INFO] loading data...')
@@ -59,63 +54,21 @@ def train_model(i):
     # save model
     model.save('../../models/api_manager/new_model/case' + str(i+1))
 
-    # get final loss for residual prediction
-    # loss.append(scalerY.inverse_transform(np.array(history.history['loss'][-1]).reshape(-1,3))[0,0])
-    # validation_loss.append(scalerY.inverse_transform(np.array(history.history['val_loss'][-1]).reshape(-1,3))[0,0])
-
     loss = history.history['loss'][-1]
     validation_loss = history.history['val_loss'][-1]
 
     print('[INFO] predicting latency...')
-    pred_response_time = model.predict(testX)
+    response_time_prediction = model.predict(testX)
 
     # print('\navg_response_time:\n','\n'.join([str(val) for val in test['avg_response_time'].values]))
 
-    rmse = np.sqrt(np.mean(np.square(test['avg_response_time'].values - pred_response_time.flatten())))
-    # mae = np.mean(np.abs(test['avg_response_time'].values - pred_response_time))
-    prediction_loss = rmse
+    rmse = np.sqrt(np.mean(np.square(test['avg_response_time'].values - response_time_prediction.flatten())))
+    # mae = np.mean(np.abs(test['avg_response_time'].values - response_time_prediction))
 
-    # # evaluation using bucket method
-    # error = []
-    # pred_error = []
+    print('\n[RESULT] loss / val_loss', loss, validation_loss)
+    print('[RESULT] RMSE = ', rmse)
 
-    # for i in range(5):
-    #     test_sample = datasets.get_test_sample(test)
-    #     testX = scalerX.transform(test_sample[['scenario', 'msg_size', 'concurrent_users']].values.reshape(-1,3))
-    #     # testY = scalerY.transform(test_sample['avg_response_time'].values.reshape(-1,3))
-    #     testY = test_sample['avg_response_time']
-
-    #     # predict residual (domain_prediction - latency)
-    #     predY = model.predict(testX)
-
-    #     # residual error
-    #     # mae = np.mean(np.abs(testY.values - predY))
-    #     rmse = np.sqrt(np.mean(np.square(testY.values - predY))) #remove .values for minmax scaler
-    #     # mae = np.mean(np.abs(testY.values - predY))
-    #     error.append(rmse)
-
-    #     # prediction error (latency)
-    #     # pred_response_time = test_sample['domain_prediction'] - scalerY.inverse_transform(predY).flatten()
-    #     pred_response_time = test_sample['domain_prediction'] - predY.flatten()
-    #     rmse = np.sqrt(np.mean(np.square(test_sample['avg_response_time'].values - pred_response_time)))
-    #     # mae = np.mean(np.abs(test_sample['avg_response_time'].values - pred_response_time))
-    #     pred_error.append(rmse)
-
-    #     # print('test sample ', i, ' ', test.shape, test_sample.shape, testY.mean(), mae)
-
-    # avg_error = np.mean(error)
-    # print('Residual sample_loss: ', avg_error)
-    # # sample_loss.append(scalerY.inverse_transform(np.array(avg_error).reshape(-1,3))[0,0])
-    # sample_loss = avg_error
-
-    # avg_error = np.mean(pred_error)
-    # print('Prediction sample_loss: ', avg_error)
-    # sample_prediction_loss = avg_error
-
-
-    print('loss/val_loss/prediction_loss/sample_loss/sample_predction_loss', loss, validation_loss, prediction_loss)
-
-    return prediction_loss, pred_response_time.flatten()
+    return rmse
 
 
 def evaluate_model(i):
@@ -132,129 +85,52 @@ def evaluate_model(i):
 
     model = keras.models.load_model('../../models/api_manager/new_model/case' + str(i+1), compile=False)
 
-
     # preds for dataset
     testX = scalerX.transform(test[['scenario_passthrough', 'scenario_transformation', 'msg_size', 'concurrent_users']].values.reshape(-1,4))
-    # testY = scalerY.transform(test['avg_response_time'].values.reshape(-1,3))
     testY = test['avg_response_time']
-    pred_response_time = model.predict(testX)
+    response_time_prediction = model.predict(testX)
+    
+    _helpers.print_predictions(testY.values, response_time_prediction.flatten())
 
-    print('\navg_response_time:\n','\n'.join([str(val) for val in testY.values]))
-    print('\npredicted avg_response_time:\n', '\n'.join([str(val) for val in pred_response_time.flatten()]))
+    save_predictions_to_csv(i,test, response_time_prediction.flatten())
 
-    results_df = pd.DataFrame({'scenario': test['scenario'], 'msg_size': test['msg_size'], 'concurrent_users': test['concurrent_users'], 'avg_response_time': testY, 'prediction': pred_response_time.flatten()})
+    rmse = np.sqrt(np.mean(np.square(testY.values - response_time_prediction.flatten())))
+    # mae = np.mean(np.abs(test['avg_response_time'].values - response_time_prediction))
+    print('\n[RESULT] RMSE = ', rmse)
+    
+    return rmse
+
+
+def train_with_cross_validation():
+    errors = []
+    
+    for i in range(5):
+        print('--------------------------------------')
+        print('\ncase', i+1)
+        rmse = train_model(i)
+        errors.append(rmse)
+
+    mean_error = _helpers.get_average_error(errors)
+    return mean_error
+
+def evaluate_with_cross_validation():
+    errors = []
+    
+    for i in range(5):
+        print('--------------------------------------')
+        print('\ncase', i+1)
+        rmse = evaluate_model(i)
+        errors.append(rmse)
+
+    mean_error = _helpers.get_average_error(errors)
+    return mean_error
+
+
+# helper functions
+def save_predictions_to_csv(i, test, latency_prediction):
+    results_df = pd.DataFrame({'scenario': test['scenario'], 'msg_size': test['msg_size'], 'concurrent_users': test['concurrent_users'], 'avg_response_time': test['avg_response_time'], 'prediction': latency_prediction})
     print(results_df)
     results_df.to_csv('../../models/api_manager/new_model/results/case' + str(i+1) + '.csv', sep=",", index= False)
 
-    rmse = np.sqrt(np.mean(np.square(testY.values - pred_response_time.flatten())))
-    # mae = np.mean(np.abs(test['avg_response_time'].values - pred_response_time))
-    prediction_loss = rmse
-
-    # forecasting
-
-    # for msg in [50, 1024, 10240, 102400]:
-
-    #     x1 = np.full((1000,), 1)
-    #     x2 = np.full((1000,), msg)
-    #     x3 = np.arange(0, 1000, 1)
-    #     new_df = pd.DataFrame({'scenario': x1, 'msg_size': x2, 'concurrent_users': x3})
-    #     y = model.predict(scalerX.transform(new_df.values.reshape(-1,3)))
-    #     y = y.flatten()
-
-
-    #     df_filtered = df[(df['msg_size'] == msg) & (df['scenario'] == 1)]
-    #     # plt.yscale('log')
-    #     plt.plot(x3, y, label='msg_size='+str(msg))
-    #     plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
-
-    # # plt.scatter(df['concurrent_users'], df['avg_response_time'])
-    # plt.title('ML Model : scenario = passthrough')
-    # plt.xlabel('concurrent_users')
-    # plt.ylabel('avg_response_time')
-    # plt.legend()
-    # # plt.show()
-    # # plt.savefig('../../Plots/_api_manager/6_regression/msg_size.png')
-    # plt.close()
-
-    # for scenario_id in [1,2]:
-
-    #     scenario = 'passthrough' if scenario_id == 1 else 'transformation'
-    #     x1 = np.full((1000,), scenario_id)
-    #     x2 = np.full((1000,), 50)
-    #     x3 = np.arange(0, 1000, 1)
-    #     new_df = pd.DataFrame({'scenario': x1, 'msg_size': x2, 'concurrent_users': x3})
-    #     y = model.predict(scalerX.transform(new_df.values.reshape(-1,3)))
-    #     y = y.flatten()
-
-
-    #     df_filtered = df[(df['scenario'] == scenario_id) & (df['msg_size'] == 50)]
-    #     # plt.yscale('log')
-    #     plt.plot(x3, y, label='scenario='+str(scenario))
-    #     plt.scatter(df_filtered['concurrent_users'], df_filtered['avg_response_time'])
-
-    # # plt.scatter(df['concurrent_users'], df['avg_response_time'])
-    # plt.title('ML Model : msg_size = 50')
-    # plt.xlabel('concurrent_users')
-    # plt.ylabel('avg_response_time')
-    # plt.legend()
-    # # plt.show()
-    # # plt.savefig('../../Plots/_api_manager/6_regression/scenario.png')
-    # plt.close()
-
-    print('prediction_loss/sample_loss/sample_predction_loss', prediction_loss, '\n')
-    
-    return prediction_loss
-
-
-def get_rregression_model_forecasts():
-
-    infile = open('../../models/api_manager/3_regression_relu/_scalars/scalerX.pkl', 'rb')
-    scalerX = pkl.load(infile)
-    infile.close()
-
-    model = keras.models.load_model('../../models/api_manager/3_regression_relu/model', compile=False)
-
-    x1 = np.full((1000,), 1)
-    x2 = np.full((1000,), 50)
-    x3 = np.arange(0, 1000, 1)
-    new_df = pd.DataFrame({'scenario': x1, 'msg_size': x2, 'concurrent_users': x3})
-    y = model.predict(scalerX.transform(new_df.values.reshape(-1,3)))
-    y = y.flatten()
-
-    return y
-
-def cross_validation():
-    error = []
-    predictions = []
-    
-    for i in range(5):
-        print('\ncase', i+1)
-        rmse, preds = train_model(i)
-        error.append(rmse)
-        predictions.append(preds)
-        print('\n'.join([str(p) for p in predictions[i]]), '\n\n')
-        print('rmse--->', error[i], '\n')
-        print('------------------------')
-
-    print('\n'.join([str(e) for e in error]), '\n\n')
-    print('mean error --->', np.mean(error))
-
-
-def evaluate():
-    error = []
-    
-    for i in range(5):
-        print('\ncase', i+1)
-        rmse = evaluate_model(i)
-        error.append(rmse)
-        print('rmse--->', error[i], '\n')
-        print('------------------------')
-
-    print('\n'.join([str(e) for e in error]), '\n\n')
-    print('mean error --->', np.mean(error))
-
-
-# train_model()
-# evaluate_model()
-# cross_validation()
-evaluate()
+# train_with_cross_validation()
+evaluate_with_cross_validation()
