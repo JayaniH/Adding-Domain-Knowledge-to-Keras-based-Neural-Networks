@@ -89,44 +89,6 @@ def train_model(i):
     # mae = np.mean(np.abs(test['avg_response_time'].values - pred_response_time))
     prediction_loss = rmse
 
-    # # evaluation using bucket method
-    # error = []
-    # pred_error = []
-
-    # for i in range(5):
-    #     test_sample = datasets.get_test_sample(test)
-    #     testX = scalerX.transform(test_sample[['scenario', 'msg_size', 'concurrent_users']].values.reshape(-1,3))
-    #     # testY = scalerY.transform(test_sample['avg_response_time'].values.reshape(-1,3))
-    #     testY = test_sample['avg_response_time']
-
-    #     # predict residual (domain_prediction - latency)
-    #     predY = model.predict(testX)
-
-    #     # residual error
-    #     # mae = np.mean(np.abs(testY.values - predY))
-    #     rmse = np.sqrt(np.mean(np.square(testY.values - predY))) #remove .values for minmax scaler
-    #     # mae = np.mean(np.abs(testY.values - predY))
-    #     error.append(rmse)
-
-    #     # prediction error (latency)
-    #     # pred_response_time = test_sample['domain_prediction'] - scalerY.inverse_transform(predY).flatten()
-    #     pred_response_time = test_sample['domain_prediction'] - predY.flatten()
-    #     rmse = np.sqrt(np.mean(np.square(test_sample['avg_response_time'].values - pred_response_time)))
-    #     # mae = np.mean(np.abs(test_sample['avg_response_time'].values - pred_response_time))
-    #     pred_error.append(rmse)
-
-    #     # print('test sample ', i, ' ', test.shape, test_sample.shape, testY.mean(), mae)
-
-    # avg_error = np.mean(error)
-    # print('Residual sample_loss: ', avg_error)
-    # # sample_loss.append(scalerY.inverse_transform(np.array(avg_error).reshape(-1,3))[0,0])
-    # sample_loss = avg_error
-
-    # avg_error = np.mean(pred_error)
-    # print('Prediction sample_loss: ', avg_error)
-    # sample_prediction_loss = avg_error
-
-
     print('loss/val_loss/prediction_loss/sample_loss/sample_predction_loss', loss, validation_loss, prediction_loss)
 
     return prediction_loss, pred_response_time.flatten()

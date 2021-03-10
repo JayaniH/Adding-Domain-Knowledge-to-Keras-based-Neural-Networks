@@ -5,6 +5,7 @@ from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import MinMaxScaler
+import _helpers
 import models
 import numpy as np
 import pandas as pd
@@ -52,17 +53,13 @@ def train_model(train_i, test_i, i):
     validation_loss = history.history['val_loss'][-1]
 
     print('[INFO] predicting latency...')
-    pred_response_time = model.predict(testX)
+    latency_prediction = model.predict(testX)
+    
+    print('[RESULT] loss / val_loss', loss, validation_loss)
+    rmse, mae, mape = _helpers.get_error(testY.values, latency_prediction.flatten())   
 
-    # print('\nlatency:\n','\n'.join([str(val) for val in test['latency'].values]))
+    return rmse, mae, mape
 
-    rmse = np.sqrt(np.mean(np.square(test['latency'].values - pred_response_time.flatten())))
-    # mae = np.mean(np.abs(test['latency'].values - pred_response_time))
-    prediction_loss = rmse
-
-    print('loss/val_loss/prediction_loss_rmse', loss, validation_loss, prediction_loss)
-
-    return prediction_loss, pred_response_time.flatten()
 
 def evaluate_model(train_i, test_i, i):
 
@@ -77,73 +74,62 @@ def evaluate_model(train_i, test_i, i):
 
     # preds for dataset
     testX = scalerX.transform(test[['concurrent_users', 'cores', 'workload_mix']].values.reshape(-1,3))
-    # testY = scalerY.transform(test['latency'].values.reshape(-1,3))
     testY = test['latency']
-    pred_response_time = model.predict(testX)
 
-    print('\nlatency:\n','\n'.join([str(val) for val in testY.values]))
-    print('\npredicted latency:\n', '\n'.join([str(val) for val in pred_response_time.flatten()]))
+    latency_prediction = model.predict(testX)
 
-    results_df = pd.DataFrame({'concurrent_users': test['concurrent_users'], 'cores': test['cores'], 'workload_mix': test['workload_mix'], 'latency': testY, 'prediction': pred_response_time.flatten()})
+    _helpers.print_predictions(testY.values, latency_prediction.flatten())
+
+    results_df = pd.DataFrame({'concurrent_users': test['concurrent_users'], 'cores': test['cores'], 'workload_mix': test['workload_mix'], 'latency': testY, 'prediction': latency_prediction.flatten()})
     print(results_df)
-    results_df.to_csv('../../models/tpcw/new_model/results/case' + str(i+1) + '.csv', sep=",", index= False)
+    results_df.to_csv('../../models/tpcw/new_model/results/K' + str(i+1) + '.csv', sep=",", index= False)
 
-    rmse = np.sqrt(np.mean(np.square(testY.values - pred_response_time.flatten())))
-    mae = np.mean(np.abs(testY.values - pred_response_time.flatten()))
-    mape = np.mean(np.abs((testY.values - pred_response_time.flatten())/testY.values))*100 
-
-    print('rmse/mae/mape', rmse, mae, mape, '\n')
+    rmse, mae, mape = _helpers.get_error(testY.values, latency_prediction.flatten())
     
     return rmse, mae, mape
 
 
 def train_with_cross_validation():
-    prediction_error = []
+    errors = {'rmse' : [], 'mae': [], 'mape': []}
 
     print('[INFO] constructing k fold split...')
     kf = KFold(n_splits=10, shuffle = True, random_state=14)
     i = 0
 
     for train_i, test_i in kf.split(df):
+        print('--------------------------------------------------------------------------------------------------------------------------------')
         print('K', str(i+1), '\n')
-        prediction_loss, preds = train_model(train_i, test_i, i)
-        prediction_error.append(prediction_loss)
-        print(preds, '\n')
+        rmse, mae, mape = train_model(train_i, test_i, i)
+        errors['rmse'].append(rmse)
+        errors['mae'].append(mae)
+        errors['mape'].append(mape)
         i += 1
 
-    print('\n'.join([str(e) for e in prediction_error]), '\n\n')
-    print('mean error --->', np.mean(prediction_error))
+    _helpers.print_errors(errors)
+
+    return errors
+
 
 def evaluate_with_cross_validation():
-    error_rmse = []
-    error_mae = []
-    error_mape = []
+    errors = {'rmse' : [], 'mae': [], 'mape': []}
     
     print('[INFO] constructing k fold split...')
     kf = KFold(n_splits=10, shuffle = True, random_state=14)
     i = 0
 
     for train_i, test_i in kf.split(df):
+        print('--------------------------------------------------------------------------------------------------------------------------------')
         print('\nK', i+1)
         rmse, mae, mape = evaluate_model(train_i, test_i, i)
-        error_rmse.append(rmse)
-        error_mae.append(mae)
-        error_mape.append(mape)
-        print('rmse--->', rmse, '\n')
-        print('mae--->', mae, '\n')
-        print('mape--->', mape, '\n')
-        print('------------------------')
-
+        errors['rmse'].append(rmse)
+        errors['mae'].append(mae)
+        errors['mape'].append(mape)
         i += 1
 
-    print('\n'.join([str(e) for e in error_rmse]), '\n')
-    print('mean rmse --->', np.mean(error_rmse), '\n\n')
+    _helpers.print_errors(errors)
 
-    print('\n'.join([str(e) for e in error_mae]), '\n')
-    print('mean mae --->', np.mean(error_mae), '\n\n')
+    return errors
 
-    print('\n'.join([str(e) for e in error_mape]), '\n')
-    print('mean mape --->', np.mean(error_mape), '\n\n')
 
-train_with_cross_validation()
-# evaluate_with_cross_validation()
+# train_with_cross_validation()
+evaluate_with_cross_validation()

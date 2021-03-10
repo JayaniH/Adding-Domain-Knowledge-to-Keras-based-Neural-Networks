@@ -5,6 +5,7 @@ from tensorflow.keras.optimizers import Adam
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import MinMaxScaler
+import _helpers
 import models
 import domain_model
 import numpy as np
@@ -25,7 +26,7 @@ domain_model_parameters = domain_model.get_parameters()
 def train_model(train_i, test_i, i):
         
     df['domain_prediction'] = domain_model.predict(df['concurrent_users'], domain_model_parameters)
-    df['residuals'] = df['domain_prediction'] - df['latency']
+    df['residual'] = df['domain_prediction'] - df['latency']
 
     print('[INFO] processing data...')
 
@@ -37,8 +38,8 @@ def train_model(train_i, test_i, i):
 
     #scaling
 
-    trainY = train['residuals']
-    testY = test['residuals']
+    trainY = train['residual']
+    testY = test['residual']
 
     scalerX = MinMaxScaler()
     trainX = scalerX.fit_transform(train[['concurrent_users', 'cores', 'workload_mix']].values.reshape(-1,3))
@@ -62,44 +63,28 @@ def train_model(train_i, test_i, i):
     loss = history.history['loss'][-1]
     validation_loss = history.history['val_loss'][-1]
 
-    print('[INFO] predicting latency...')
-    predY = model.predict(testX)
+    print('[INFO] predicting residuals...')
+    residual_prediction = model.predict(testX)
 
+    # residual_prediction = residual = domain_prediction - latency
+    # latency_prediction = domain_prediction  - (domain_prediction - latency)
 
-    domain_error = np.sqrt(np.mean(np.square(test['domain_prediction'] - test['latency'])))
-    print('domain_error', domain_error)
-    residual_error = np.sqrt(np.mean(np.square(testY.values - predY.flatten())))
-    print('residual_error', residual_error)
+    print('[INFO] calculating latency predictions...')
+    latency_prediction = test['domain_prediction'] - residual_prediction.flatten()
 
-    # predY = residuals = domain_prediction - latency
-    # pred_response_time = domain_prediction  - (domain_prediction - latency)
+    _helpers.print_predictions(test['latency'].values, latency_prediction.values)
 
-    # pred_response_time = test['domain_prediction'] - scalerY.inverse_transform(predY).flatten()
-    pred_response_time = test['domain_prediction'] - predY.flatten()
-    rmse = np.sqrt(np.mean(np.square(test['latency'].values - pred_response_time)))
-    # mae = np.mean(np.abs(test['latency'].values - pred_response_time))
-    prediction_loss = rmse
+    print('[RESULT] loss / val_loss', loss, validation_loss)
+    rmse, mae, mape = _helpers.get_error(test['latency'].values, latency_prediction)
 
-    print('\nlatency:\n','\n'.join([str(val) for val in test['latency'].values]))
-    print('\npredicted latency by hybrid model:\n', '\n'.join([str(val) for val in pred_response_time.values]))
+    save_predictions_to_csv(i, test, residual_prediction.flatten(), latency_prediction)
 
-    rms_residuals = np.sqrt(np.mean(np.square(test['residuals'])))
-    rms_latency = np.sqrt(np.mean(np.square(test['latency'])))
-
-    results_df = pd.DataFrame({'concurrent_users': test['concurrent_users'], 'cores': test['cores'], 'workload_mix': test['workload_mix'], 'latency': test['latency'], 'domain_prediction': test['domain_prediction'],'residuals': testY , 'residual_prediction': predY.flatten(), 'prediction': pred_response_time})
-    print(results_df)
-    results_df.to_csv('../../models/tpcw/new_model/results/case' + str(i+1) + '.csv', sep=",", index= False)
-
-    print('loss/val_loss/domain_loss/residual_loss/prediction_loss/', loss, validation_loss, domain_error, residual_error, prediction_loss)
-
-    print('percentage error residuals/ domain/ hybrid', (residual_error/rms_residuals) * 100 , (domain_error/rms_latency) * 100, (prediction_loss/rms_latency) * 100)
-
-    return prediction_loss, pred_response_time
+    return rmse, mae, mape
 
 def evaluate_model(train_i, test_i, i):
     
     df['domain_prediction'] = domain_model.predict(df['concurrent_users'], domain_model_parameters)
-    df['residuals'] = df['domain_prediction'] - df['latency']
+    df['residual'] = df['domain_prediction'] - df['latency']
 
     infile = open('../../models/tpcw/new_model/_scalars/scalerX_' + str(i+1) +'.pkl', 'rb')
     scalerX = pkl.load(infile)
@@ -110,94 +95,77 @@ def evaluate_model(train_i, test_i, i):
 
     model = keras.models.load_model('../../models/tpcw/new_model/K' + str(i+1), compile=False)
 
-
     # preds for dataset
     testX = scalerX.transform(test[['concurrent_users', 'cores', 'workload_mix']].values.reshape(-1,3))
-    # testY = scalerY.transform(test['residuals'].values.reshape(-1,3))
-    testY = test['residuals']
-    predY = model.predict(testX)
+    testY = test['residual']
 
-    domain_error = np.sqrt(np.mean(np.square(test['domain_prediction'] - test['latency'])))
-    print('domain_error', domain_error)
-    residual_error = np.sqrt(np.mean(np.square(testY.values - predY.flatten())))
-    print('residual_error', residual_error)
+    print('[INFO] predicting residuals...')
+    residual_prediction = model.predict(testX)
 
-    # predY = d_latency  - (d_latency - latency)
-    # pred_response_time = test['domain_prediction'] - scalerY.inverse_transform(predY).flatten()
-    pred_response_time = test['domain_prediction'] - predY.flatten()
+    # residual_prediction = d_latency  - (d_latency - latency)
+    # latency_prediction = test['domain_prediction'] - scalerY.inverse_transform(residual_prediction).flatten()
+
+    print('[INFO] calculating latency predictions...')
+    latency_prediction = test['domain_prediction'] - residual_prediction.flatten()
 
     # remove negative preds
-    # pred_response_time = np.maximum(0.0, pred_response_time)
+    # latency_prediction = np.maximum(0.0, latency_prediction)
 
-    rmse = np.sqrt(np.mean(np.square(test['latency'].values - pred_response_time)))
-    mae = np.mean(np.abs(test['latency'].values - pred_response_time))
-    mape = np.mean(np.abs((test['latency'].values - pred_response_time)/test['latency'].values))*100 
+    _helpers.print_predictions(test['latency'].values, latency_prediction.values)
 
-    prediction_loss = rmse
+    rmse, mae, mape = _helpers.get_error(test['latency'].values, latency_prediction)
 
-    print('\nlatency:\n','\n'.join([str(val) for val in test['latency'].values]))
-    print('\npredicted latency by hybrid model:\n', '\n'.join([str(val) for val in pred_response_time.values]))
-
-    rms_residuals = np.sqrt(np.mean(np.square(test['residuals'])))
-    rms_latency = np.sqrt(np.mean(np.square(test['latency'])))
-
-    results_df = pd.DataFrame({'concurrent_users': test['concurrent_users'], 'cores': test['cores'], 'workload_mix': test['workload_mix'], 'latency': test['latency'], 'domain_prediction': test['domain_prediction'],'residuals': testY , 'residual_prediction': predY.flatten(), 'prediction': pred_response_time})
-    print(results_df)
-    results_df.to_csv('../../models/tpcw/new_model/results/case' + str(i+1) + '.csv', sep=",", index= False)
-
-    print('domain_loss/residual_loss/prediction_loss/', domain_error, residual_error, prediction_loss)
-    print('percentage error domain/ residuals/ hybrid', (domain_error/rms_latency) * 100, (residual_error/rms_residuals) * 100, (prediction_loss/rms_latency) * 100)
+    save_predictions_to_csv(i, test, residual_prediction.flatten(), latency_prediction)
     
     return rmse, mae, mape
 
+
 def train_with_cross_validation():
-    prediction_error = []
+    errors = {'rmse' : [], 'mae': [], 'mape': []}
 
     print('[INFO] constructing k fold split...')
     kf = KFold(n_splits=10, shuffle = True, random_state=14)
     i = 0
 
     for train_i, test_i in kf.split(df):
+        print('--------------------------------------------------------------------------------------------------------------------------------')
         print('K', str(i+1), '\n')
-        prediction_loss, preds = train_model(train_i, test_i, i)
-        prediction_error.append(prediction_loss)
-        print(preds, '\n')
+        rmse, mae, mape = train_model(train_i, test_i, i)
+        errors['rmse'].append(rmse)
+        errors['mae'].append(mae)
+        errors['mape'].append(mape)
         i += 1
 
-    print('\n'.join([str(e) for e in prediction_error]), '\n\n')
-    print('mean error --->', np.mean(prediction_error))
+    _helpers.print_errors(errors)
+
+    return errors
 
 def evaluate_with_cross_validation():
-    error_rmse = []
-    error_mae = []
-    error_mape = []
+    errors = {'rmse' : [], 'mae': [], 'mape': []}
     
     print('[INFO] constructing k fold split...')
     kf = KFold(n_splits=10, shuffle = True, random_state=14)
     i = 0
 
     for train_i, test_i in kf.split(df):
+        print('--------------------------------------------------------------------------------------------------------------------------------')
         print('\nK', i+1)
         rmse, mae, mape = evaluate_model(train_i, test_i, i)
-        error_rmse.append(rmse)
-        error_mae.append(mae)
-        error_mape.append(mape)
-        print('rmse--->', rmse, '\n')
-        print('mae--->', mae, '\n')
-        print('mape--->', mape, '\n')
-        print('------------------------')
+        errors['rmse'].append(rmse)
+        errors['mae'].append(mae)
+        errors['mape'].append(mape)
 
         i += 1
 
-    print('\n'.join([str(e) for e in error_rmse]), '\n')
-    print('mean rmse --->', np.mean(error_rmse), '\n\n')
-
-    print('\n'.join([str(e) for e in error_mae]), '\n')
-    print('mean mae --->', np.mean(error_mae), '\n\n')
-
-    print('\n'.join([str(e) for e in error_mape]), '\n')
-    print('mean mape --->', np.mean(error_mape), '\n\n')
+    _helpers.print_errors(errors)
+    return errors
 
 
-train_with_cross_validation()
+# helper functions
+def save_predictions_to_csv(i, df, residual_prediction, latency_prediction):
+    results_df = pd.DataFrame({'concurrent_users': df['concurrent_users'], 'cores': df['cores'], 'workload_mix': df['workload_mix'], 'latency': df['latency'], 'domain_prediction': df['domain_prediction'],'residual': df['residual'] , 'residual_prediction': residual_prediction, 'prediction': latency_prediction})
+    print(results_df)
+    results_df.to_csv('../../models/tpcw/new_model/results/K' + str(i+1) + '.csv', sep=",", index= False)
+
+# train_with_cross_validation()
 # evaluate_with_cross_validation()

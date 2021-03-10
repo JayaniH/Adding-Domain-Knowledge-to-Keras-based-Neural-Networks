@@ -42,7 +42,7 @@ test_apis = [
     'ballerinax/sfdc/QueryClient#getQueryResult',
     'ballerinax/sfdc/SObjectClient#createOpportunity'
 ]
-regression_predictions = {}
+ml_predictions = {}
 
 # load data
 print("[INFO] loading data...")
@@ -50,7 +50,7 @@ df = datasets.load_data()
 
 
 def train_models():
-    results_file = open("./results/regression_results.txt", "w")
+    results_file = open("./results/ml_results.txt", "w")
 
     for name, group in df:
 
@@ -88,7 +88,7 @@ def train_models():
 
         # save scaler
 
-        outfile = open("../../models/52_regression_small_sample/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb")
+        outfile = open("../../models/52_ml_small_sample/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb")
         pkl.dump(scalerx, outfile)
         outfile.close()
 
@@ -100,7 +100,7 @@ def train_models():
         history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
 
         # save model
-        model.save('../../models/52_regression_small_sample/' + name.replace("/", "_"))
+        model.save('../../models/52_ml_small_sample/' + name.replace("/", "_"))
         
         # get final loss
         loss.append(history.history['loss'][-1]) # * maxLatency
@@ -188,15 +188,15 @@ def evaluate_models():
 
         # maxLatency = group["latency"].max()
 
-        infile = open("../../models/5_regression_rmse/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../../models/5_ml_rmse/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "rb")
         scalerx = pkl.load(infile)
         infile.close()
 
         (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
-        model = keras.models.load_model('../../models/5_regression_rmse/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../../models/5_ml_rmse/' + name.replace("/", "_"), compile=False)
 
-        # preds for regression curve
+        # preds for ml curve
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
         preds = model.predict(scalerx.transform(x.reshape(-1, 1)))
         preds = preds # * maxLatency
@@ -235,13 +235,13 @@ def evaluate_models():
         # plt.yscale("log")
         plt.scatter(group.wip, group.latency, label='data')
         plt.scatter(test["wip"], pred_y, label='test data')
-        plt.plot(x, preds, 'r', label='regression line')
+        plt.plot(x, preds, 'r', label='ml curve')
         plt.title(name)
         plt.xlabel('wip')
         plt.ylabel('latency')
         plt.legend()
         # plt.show()
-        # plt.savefig('../../Plots/regression_test_plots_mae_outliers_removed/' + name.replace("/", "_") + '_loss.png')
+        # plt.savefig('../../Plots/ml_test_plots_mae_outliers_removed/' + name.replace("/", "_") + '_loss.png')
         plt.close()
 
     mean_prediction_loss = np.mean(prediction_loss)
@@ -262,26 +262,26 @@ def evaluate_models():
 
 
 
-def get_regression_forecasts():
+def get_ml_model_forecasts():
     for name, group in df:
 
         group = datasets.remove_outliers(group)
         # maxLatency = group["latency"].max()
 
-        infile = open("../../models/12_regression_epoch200_batch4_rmse_ouliers_removed_unscaledY/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../../models/12_ml_epoch200_batch4_rmse_ouliers_removed_unscaledY/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "rb")
         scalerx = pkl.load(infile)
         infile.close()
 
-        model = keras.models.load_model('../../models/12_regression_epoch200_batch4_rmse_ouliers_removed_unscaledY/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../../models/12_ml_epoch200_batch4_rmse_ouliers_removed_unscaledY/' + name.replace("/", "_"), compile=False)
 
-        # preds for regression curve
+        # preds for ml curve
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
         preds = model.predict(scalerx.transform(x.reshape(-1, 1)))
         preds = preds # * maxLatency
-        regression_predictions[name] = preds
+        ml_predictions[name] = preds
 
         # print(name, preds)
-    return regression_predictions
+    return ml_predictions
 
 train_models()
 # evaluate_models()

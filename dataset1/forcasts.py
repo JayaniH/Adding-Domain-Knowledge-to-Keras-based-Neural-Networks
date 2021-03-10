@@ -1,11 +1,11 @@
 import numpy as np
 import pandas as pd
 import datasets
-import regression
+import ml_model
 import regression_xgboost
 import domain_model3 as domain_model
 import residual_model
-import regression_with_domain_regularization
+import ml_model_with_custom_loss1
 import seaborn as sns
 import matplotlib.pyplot as plt 
 
@@ -32,18 +32,15 @@ test_apis = [
 
 df = datasets.load_data()
 
-# regression.evaluate_models()
-# domain_model.run()
-
 xgboost_test_preds = regression_xgboost.xgb_regression_forecast()
 
-regression_forecasts = regression.get_regression_forecasts()
+ml_forecasts = ml_model.get_ml_model_forecasts()
 
 domain_test_preds = domain_model.get_domain_forecasts()
 
 residual_model_forecasts = residual_model.get_residual_model_forecasts()
 
-regression_with_domain_regularization_forecasts = regression_with_domain_regularization.get_regression_with_domain_regularization_forecasts()
+ml_model_with_custom_loss_forecasts = ml_model_with_custom_loss1.get_ml_with_custom_loss_forecasts()
 
 # data_plot = pd.DataFrame({"api_name":high_loss_apis, "wip": df.wip, "latency": df.latency, "xgboost": xgboost_preds, "domain": domain_preds, "wip_all": np.arange(0, 1500)})
 # g = sns.FacetGrid(data_plot, col="api_name", col_wrap=5)
@@ -74,11 +71,11 @@ for name, group in df:
 
     # plt.yscale("log")
     plt.scatter(group.wip, group.latency)
-    plt.plot(x, regression_forecasts[name], 'r', label='regression')
+    plt.plot(x, ml_forecasts[name], 'r', label='ml model')
     plt.plot(x, xgboost_test_preds[name], 'm', label='xgboost')
-    plt.plot(x, domain_test_preds[name], 'y', label='domain')
+    plt.plot(x, domain_test_preds[name], 'y', label='domain model')
     plt.plot(x, residual_model_forecasts[name], 'g', label='hybrid(residual model)')
-    plt.plot(x, regression_with_domain_regularization_forecasts[name], 'b', label='regression with domain regularization')
+    plt.plot(x, ml_model_with_custom_loss_forecasts[name], 'b', label='ml model with domain regularization')
     plt.title(name)
     plt.xlabel('wip')
     plt.ylabel('latency')
@@ -86,7 +83,7 @@ for name, group in df:
     plt.legend()
     # plt.figtext(0.5, 0, "regression val_loss: " + str(val_loss[i]), fontsize=11)
     # plt.show()
-    plt.savefig('../Plots/forecasts_new/' + name.replace("/", "_") + '.png')
+    # plt.savefig('../Plots/forecasts_new/' + name.replace("/", "_") + '.png')
     plt.close()
     i=i+1
 

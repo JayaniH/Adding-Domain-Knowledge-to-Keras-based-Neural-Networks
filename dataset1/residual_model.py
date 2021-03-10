@@ -226,7 +226,7 @@ def evaluate_models():
 
         model = keras.models.load_model('../../models/53_residual_model_small_sample/' + name.replace("/", "_"), compile=False)
 
-        # preds for regression curve
+        # preds for ml curve
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
         domain_latency = domain_model.predict(name, x, domain_model_parameters[name])
         preds = model.predict(scalerX.transform(x.reshape(-1, 1)))
