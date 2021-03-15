@@ -29,7 +29,7 @@ def create_model(df, train_i, test_i, i):
     train = df.iloc[train_i]
     test = df.iloc[test_i]
 
-    params, _ = curve_fit(f, train['concurrent_users'], train['mid_latency'], bounds=([1e-9,1e-9,1e-9],[np.inf,10,np.inf]))
+    params, _ = curve_fit(f, train['concurrent_users'], train['mid_latency'], bounds=([0,0,1e-9],[1,1,np.inf]))
     # result = minimize(cost, [0,0,1], args=(train['concurrent_users'], train['mid_latency']), bounds=((1e-9, np.inf), (1e-9, np.inf), (1e-9, np.inf)))
     # print('result', result)
 
@@ -125,6 +125,6 @@ def predict(x, params):
     return y
 
 
-# create_model_with_cross_validation()
+create_model_with_cross_validation()
 # print(get_parameters())
 # evaluate_model()
