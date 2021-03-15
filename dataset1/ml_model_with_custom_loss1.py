@@ -11,6 +11,7 @@ import domain_model3 as domain_model
 import numpy as np
 import pickle as pkl
 
+# using lambda layer
 def custom_loss(y_true, y):
     y_pred = y[:,0]
     domain_latency = y[:,1]

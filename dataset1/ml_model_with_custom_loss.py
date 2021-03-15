@@ -11,7 +11,7 @@ import domain_model3 as domain_model
 import numpy as np
 import pickle as pkl
 
-# using lambda layer
+
 def custom_loss(threshold):
 
     def loss(y, y_pred):
