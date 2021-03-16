@@ -43,7 +43,7 @@ def fit_parameters_and_evaluate():
         trainY = train["latency"]
 
         print("[INFO] fittinig parameters...")
-        params, cov = curve_fit(USL, trainX, trainY, bounds=([0,0,0],[np.inf, 10, np.inf]))
+        params, cov = curve_fit(USL, trainX, trainY, p0=[0.5, 0.5, 0.5], bounds=([0,0,0],[1, 1, np.inf]))
 
         print("Fitteed Parameters: ", params)
         parameters[name] = params

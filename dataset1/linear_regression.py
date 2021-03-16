@@ -1,7 +1,7 @@
 from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt 
 import pickle as pkl
-import xgboost as xgb
 import pandas as pd 
 import numpy as np
 import datasets
@@ -10,7 +10,6 @@ loss = []
 sample_loss = []
 EPSILON =  1e-6
 
-test_preds_xgb = {}
 df = datasets.load_data()
 
 def train_models():
@@ -21,37 +20,54 @@ def train_models():
 
         group = datasets.remove_outliers(group)
 
-        X = group["wip"].values.reshape(group["wip"].shape[0],1)
-        y = group["latency"]
+        print(name, "\n")
 
-        data_dmatrix = xgb.DMatrix(data=X, label=y)
+        print("[INFO] constructing training/testing split...")
+        (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
-        # print(X.shape,y.shape)
+        print("[INFO] processing data...")
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=123)
+        trainY = train["latency"] 
+        testY = test["latency"] 
 
-        xg_reg = xgb.XGBRegressor(objective ='reg:linear', colsample_bytree = 0.3, learning_rate = 0.1, max_depth = 5, alpha = 10, n_estimators = 10)
+        trainX = train["wip"].values.reshape(-1,1)
+        testX = test["wip"].values.reshape(-1,1)
+    
+        # scalerx = MinMaxScaler()
 
-        xg_reg.fit(X_train, y_train)
-        outfile = open("../../models/api_metrics/new_model/xgb_" + name.replace("/", "_") + ".pkl", "wb")
-        pkl.dump(xg_reg, outfile)
+        # trainX = scalerx.fit_transform(train["wip"].values.reshape(-1,1))
+        # testX = scalerx.transform(test["wip"].values.reshape(-1,1))
+
+        # # save scaler
+
+        # outfile = open("../../models/52_ml_small_sample/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb")
+        # pkl.dump(scalerx, outfile)
+        # outfile.close()
+
+        model = LinearRegression(normalize=True)
+        model.fit(trainX, trainY)
+        score = model.score(trainX, trainY)
+
+        print("[RESULT] model score = ", score)
+
+        outfile = open("../../models/api_metrics/new_model/" + name.replace("/", "_") + ".pkl", "wb")
+        pkl.dump(model, outfile)
         outfile.close()
 
-        preds = xg_reg.predict(X_test)
+        preds = model.predict(testX)
 
-        rmse = np.sqrt(np.mean(np.square(y_test - preds)))
-        # rmspe = (np.sqrt(np.mean(np.square((y_test - preds) / (y_test + EPSILON))))) * 100
-        # mae = np.mean(np.abs(y_test - preds))
-        loss.append(rmse)
+        # rmse = np.sqrt(np.mean(np.square(testY - preds)))
+        # rmspe = (np.sqrt(np.mean(np.square((testY - preds) / (testY + EPSILON))))) * 100
+        mae = np.mean(np.abs(testY - preds))
+        loss.append(mae)
 
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
-        y = xg_reg.predict(x.reshape(-1, 1))
-        test_preds_xgb[name] = y
+        y = model.predict(x.reshape(-1, 1))
 
         # print(name, preds)
 
         plt.scatter(group["wip"], group["latency"], label='data')
-        # plt.scatter(X_test["wip"], preds, label='test data')
+        # plt.scatter(testX["wip"], preds, label='test data')
         plt.plot(x, y, 'r', label='ml curve')
         plt.title(name)
         plt.xlabel('wip')
@@ -65,7 +81,7 @@ def train_models():
     median_loss = np.percentile(loss, 50)
     percentile_loss = np.percentile(loss, 95)
 
-    print("-------Regression XGBoost--------")
+    print("-------Linear Regression--------")
     print("\n".join([str(l) for l in loss]), "\n\n")
 
     print("Mean loss", mean_loss)
@@ -81,37 +97,39 @@ def evaluate_models():
 
         group = datasets.remove_outliers(group)
 
-        X = group["wip"].values.reshape(group["wip"].shape[0],1)
-        y = group["latency"]
+        print("[INFO] constructing training/testing split...")
+        (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
-        data_dmatrix = xgb.DMatrix(data=X, label=y)
+        print("[INFO] processing data...")
 
-        # print(X.shape,y.shape)
+        trainY = train["latency"] 
+        testY = test["latency"] 
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=123)
+        trainX = train["wip"].values.reshape(-1,1)
+        testX = test["wip"].values.reshape(-1,1)
 
-        infile = open("../../models/api_metrics/new_model/xgb_" + name.replace("/", "_") + ".pkl", "rb")
-        xg_reg = pkl.load(infile)
+        infile = open("../../models/api_metrics/new_model/" + name.replace("/", "_") + ".pkl", "rb")
+        model = pkl.load(infile)
         infile.close()
 
-        preds = xg_reg.predict(X_test)
-
-        rmse = np.sqrt(np.mean(np.square(y_test - preds)))
-        # rmspe = (np.sqrt(np.mean(np.square((y_test - preds) / (y_test + EPSILON))))) * 100
-        # mae = np.mean(np.abs(y_test - preds))
-        loss.append(rmse)
+        preds = model.predict(testX)
+        
+        # rmse = np.sqrt(np.mean(np.square(testY - preds)))
+        # rmspe = (np.sqrt(np.mean(np.square((testY - preds) / (testY + EPSILON))))) * 100
+        mae = np.mean(np.abs(testY - preds))
+        loss.append(mae)
 
         # evaluation using bucket method
         error = []
 
         for i in range(5):
-            test_sample = datasets.get_test_sample(X_test)
+            test_sample = datasets.get_test_sample(testX)
             testY = test_sample["latency"] #/ maxLatency
 
-            predY = xg_reg.predict(X_test)
-            # mae = np.mean(np.abs(testY.values - predY))
-            rmse = np.sqrt(np.mean(np.square(testY.values - predY)))
-            error.append(rmse)
+            predY = model.predict(testX)
+            mae = np.mean(np.abs(testY.values - predY))
+            # rmse = np.sqrt(np.mean(np.square(testY.values - predY)))
+            error.append(mae)
 
             # print("test sample ", i, " ", test.shape, test_sample.shape, testY.mean(), mae)
 
@@ -120,13 +138,12 @@ def evaluate_models():
         sample_loss.append(avg_error) # * maxLatency
 
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
-        y = xg_reg.predict(x.reshape(-1, 1))
-        test_preds_xgb[name] = y
+        y = model.predict(x.reshape(-1, 1))
 
         # print(name, preds)
 
         plt.scatter(group["wip"], group["latency"], label='data')
-        # plt.scatter(X_test["wip"], preds, label='test data')
+        # plt.scatter(testX["wip"], preds, label='test data')
         plt.plot(x, y, 'r', label='ml curve')
         plt.title(name)
         plt.xlabel('wip')
@@ -144,7 +161,7 @@ def evaluate_models():
     median_sample_loss = np.percentile(sample_loss, 50)
     percentile_sample_loss = np.percentile(sample_loss, 95)
 
-    print("-------Regression XGBoost--------")
+    print("-------Linear Regression--------")
     print("\n".join([str(l) for l in loss]), "\n\n")
     print("\n".join([str(l) for l in sample_loss]), "\n\n")
 
@@ -156,7 +173,7 @@ def evaluate_models():
 
 
 def predict(api, x):
-    infile = open("../../models/api_metrics/new_model/xgb_" + api.replace("/", "_") + ".pkl", "rb")
+    infile = open("../../models/api_metrics/new_model/" + api.replace("/", "_") + ".pkl", "rb")
     model = pkl.load(infile)
     infile.close()
 
@@ -165,10 +182,7 @@ def predict(api, x):
     return predictions
 
 
-def xgb_regression_forecast():
-    return test_preds_xgb
-
-# train_models()
-evaluate_models()
+train_models()
+# evaluate_models()
 # x = np.arange(0, 1000 + 0.1 , 0.01)
 # predict('ballerina/http/Client#delete#https://graph.microsoft.com', x.reshape(-1, 1))
