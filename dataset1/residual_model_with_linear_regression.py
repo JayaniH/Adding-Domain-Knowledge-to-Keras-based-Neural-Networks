@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 import datasets
 import models
-import regression_xgboost as xgb
+import linear_regression as linear_regression_model
 import numpy as np
 import pickle as pkl
 
@@ -47,8 +47,8 @@ def train_models():
         group = datasets.remove_outliers(group)
         print(name, "\n")
         
-        group["xgb_latency"] = xgb.predict(name, group["wip"].values.reshape(-1, 1))
-        group["residuals"] = group["xgb_latency"] - group["latency"]
+        group["regression_latency"] = linear_regression_model.predict(name, group["wip"].values.reshape(-1, 1))
+        group["residuals"] = group["regression_latency"] - group["latency"]
 
         print("[INFO] constructing training/testing split...")
         (train, test) = train_test_split(group, test_size=0.3, random_state=42)
@@ -71,7 +71,7 @@ def train_models():
 
         model = models.create_residual_model(trainX.shape[1])
         opt = Adam(learning_rate=1e-2, decay=1e-3/200)
-        model.compile(loss='mean_absolute_error', optimizer=opt)
+        model.compile(loss=root_mean_squared_error, optimizer=opt)
 
         print("[INFO] training model...")
         history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
@@ -85,13 +85,13 @@ def train_models():
         print("[INFO] predicting latency...")
         predY = model.predict(testX)
 
-        # predY = residuals = xgb_latency - latency
-        # pred_latency = xgb_latency  - (xgb_latency - latency)
+        # predY = residuals = regression_latency - latency
+        # pred_latency = regression_latency  - (regression_latency - latency)
 
-        pred_latency = test["xgb_latency"] - predY.flatten()
-        # rmse = np.sqrt(np.mean(np.square(test["latency"].values - pred_latency)))
-        mae = np.mean(np.abs(test["latency"].values - pred_latency))
-        prediction_loss.append(mae)
+        pred_latency = test["regression_latency"] - predY.flatten()
+        rmse = np.sqrt(np.mean(np.square(test["latency"].values - pred_latency)))
+        # mae = np.mean(np.abs(test["latency"].values - pred_latency))
+        prediction_loss.append(rmse)
 
         # evaluation using bucket method
         error = []
@@ -103,21 +103,20 @@ def train_models():
             # testY = scalerY.transform(test_sample["residuals"].values.reshape(-1,1))
             testY = test_sample["residuals"]
 
-            # predict residual (xgb_latency - latency)
+            # predict residual (regression_latency - latency)
             predY = model.predict(testX)
 
             # residual error
+            rmse = np.sqrt(np.mean(np.square(testY.values - predY))) #remove .values for minmax scaler
             # mae = np.mean(np.abs(testY.values - predY))
-            # rmse = np.sqrt(np.mean(np.square(testY.values - predY))) #remove .values for minmax scaler
-            mae = np.mean(np.abs(testY.values - predY))
-            error.append(mae)
+            error.append(rmse)
 
             # prediction error (latency)
-            # pred_latency = test_sample["xgb_latency"] - scalerY.inverse_transform(predY).flatten()
-            pred_latency = test_sample["xgb_latency"] - predY.flatten()
-            # rmse = np.sqrt(np.mean(np.square(test_sample["latency"].values - pred_latency)))
-            mae = np.mean(np.abs(test_sample["latency"].values - pred_latency))
-            pred_error.append(mae)
+            # pred_latency = test_sample["regression_latency"] - scalerY.inverse_transform(predY).flatten()
+            pred_latency = test_sample["regression_latency"] - predY.flatten()
+            rmse = np.sqrt(np.mean(np.square(test_sample["latency"].values - pred_latency)))
+            # mae = np.mean(np.abs(test_sample["latency"].values - pred_latency))
+            pred_error.append(rmse)
 
             # print("test sample ", i, " ", test.shape, test_sample.shape, testY.mean(), mae)
 
@@ -176,8 +175,8 @@ def evaluate_models():
 
         group = datasets.remove_outliers(group)
 
-        group["xgb_latency"] = xgb.predict(name, group["wip"].values.reshape(-1, 1))
-        group["residuals"] = group["xgb_latency"] - group["latency"]
+        group["regression_latency"] = linear_regression_model.predict(name, group["wip"].values.reshape(-1, 1))
+        group["residuals"] = group["regression_latency"] - group["latency"]
 
         infile = open("../../models/api_metrics/new_model_res/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
         scalerX = pkl.load(infile)
@@ -189,11 +188,11 @@ def evaluate_models():
 
         # preds for ml curve
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
-        xgb_latency = xgb.predict(name, x.reshape(-1, 1))
+        regression_latency = linear_regression_model.predict(name, x.reshape(-1, 1))
 
         preds = model.predict(scalerX.transform(x.reshape(-1, 1)))
-        # preds = xgb_latency - scalerY.inverse_transform(preds).flatten()
-        preds = xgb_latency - preds.flatten()
+        # preds = regression_latency - scalerY.inverse_transform(preds).flatten()
+        preds = regression_latency - preds.flatten()
 
         # print(name, preds)
 
@@ -204,11 +203,11 @@ def evaluate_models():
         predY = model.predict(testX)
 
         # predY = d_latency  - (d_latency - latency)
-        # pred_latency = test["xgb_latency"] - scalerY.inverse_transform(predY).flatten()
-        pred_latency = test["xgb_latency"] - predY.flatten()
-        # rmse = np.sqrt(np.mean(np.square(test["latency"].values - pred_latency)))
-        mae = np.mean(np.abs(test["latency"].values - pred_latency))
-        prediction_loss.append(mae)
+        # pred_latency = test["regression_latency"] - scalerY.inverse_transform(predY).flatten()
+        pred_latency = test["regression_latency"] - predY.flatten()
+        rmse = np.sqrt(np.mean(np.square(test["latency"].values - pred_latency)))
+        # mae = np.mean(np.abs(test["latency"].values - pred_latency))
+        prediction_loss.append(rmse)
 
 
         # evaluation using bucket method
@@ -221,20 +220,20 @@ def evaluate_models():
             # testY = scalerY.transform(test_sample["residuals"].values.reshape(-1,1))
             testY = test_sample["residuals"]
 
-            # predict residual (xgb_latency - latency)
+            # predict residual (regression_latency - latency)
             predY = model.predict(testX)
 
             # residual error
-            # rmse = np.sqrt(np.mean(np.square(testY.values - predY)))
-            mae = np.mean(np.abs(testY.values - predY))
-            error.append(mae)
+            rmse = np.sqrt(np.mean(np.square(testY.values - predY)))
+            # mae = np.mean(np.abs(testY.values - predY))
+            error.append(rmse)
 
             # prediction error (latency)
-            # pred_latency = test_sample["xgb_latency"] - scalerY.inverse_transform(predY).flatten()
-            pred_latency = test_sample["xgb_latency"] - predY.flatten()
-            # rmse = np.sqrt(np.mean(np.square(test_sample["latency"].values - pred_latency)))
-            mae = np.mean(np.abs(test_sample["latency"].values - pred_latency))
-            pred_error.append(mae)
+            # pred_latency = test_sample["regression_latency"] - scalerY.inverse_transform(predY).flatten()
+            pred_latency = test_sample["regression_latency"] - predY.flatten()
+            rmse = np.sqrt(np.mean(np.square(test_sample["latency"].values - pred_latency)))
+            # mae = np.mean(np.abs(test_sample["latency"].values - pred_latency))
+            pred_error.append(rmse)
 
 
         avg_error = np.mean(error)
@@ -251,7 +250,7 @@ def evaluate_models():
         plt.scatter(group["wip"], group["residuals"], label='data')
         # plt.scatter(test["wip"], pred_y, label='test data')
         # plt.plot(x, preds, 'r', label='residual line')
-        plt.plot(x, xgb_latency, 'r', label='domain')
+        plt.plot(x, regression_latency, 'r', label='domain')
         plt.title(name)
         plt.xlabel('wip')
         plt.ylabel('latency')
@@ -292,8 +291,8 @@ def get_residual_model_forecasts():
 
         group = datasets.remove_outliers(group)
 
-        group["xgb_latency"] = xgb.predict(name, group["wip"].values.reshape(-1, 1))
-        group["residuals"] = group["xgb_latency"] - group["latency"]
+        group["regression_latency"] = linear_regression_model.predict(name, group["wip"].values.reshape(-1, 1))
+        group["residuals"] = group["regression_latency"] - group["latency"]
 
         infile = open("../../models/10_residual_rmse/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
         scalerX = pkl.load(infile)
@@ -302,10 +301,10 @@ def get_residual_model_forecasts():
         model = keras.models.load_model('../../models/10_residual_rmse/' + name.replace("/", "_"), compile=False)
 
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
-        xgb_latency = xgb.predict(name, x.reshape(-1, 1))
+        regression_latency = linear_regression_model.predict(name, x.reshape(-1, 1))
         preds = model.predict(scalerX.transform(x.reshape(-1, 1)))
-        # preds = xgb_latency - scalerY.inverse_transform(preds).flatten()
-        preds = xgb_latency - preds.flatten()
+        # preds = regression_latency - scalerY.inverse_transform(preds).flatten()
+        preds = regression_latency - preds.flatten()
         residual_models_predictions[name] = preds
 
         # print(name, preds)

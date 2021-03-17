@@ -182,7 +182,7 @@ def predict(api, x):
     return predictions
 
 
-train_models()
+# train_models()
 # evaluate_models()
 # x = np.arange(0, 1000 + 0.1 , 0.01)
 # predict('ballerina/http/Client#delete#https://graph.microsoft.com', x.reshape(-1, 1))
