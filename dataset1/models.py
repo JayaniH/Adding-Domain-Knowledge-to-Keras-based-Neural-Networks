@@ -13,9 +13,9 @@ from tensorflow.keras.models import Model
 
 def create_model(dim):
     model = Sequential()
-    model.add(Dense(8, input_dim=dim, activation="relu"))
-    model.add(Dense(6, activation="relu"))
-    model.add(Dense(4, activation="relu"))
+    model.add(Dense(4, input_dim=dim, activation="relu"))
+    # model.add(Dense(6, activation="relu"))
+    model.add(Dense(3, activation="relu"))
     model.add(Dense(1, activation="linear"))
 
     return model

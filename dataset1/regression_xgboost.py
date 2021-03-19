@@ -6,78 +6,53 @@ import pandas as pd
 import numpy as np
 import datasets
 
-loss = []
-sample_loss = []
-EPSILON =  1e-6
 
-test_preds_xgb = {}
 df = datasets.load_data()
 
 def train_models():
+    prediction_errors = []
 
     for name, group in df:
-        # if (name not in high_loss_apis) and (name not in test_apis):
-        #     continue
 
         group = datasets.remove_outliers(group)
 
         X = group["wip"].values.reshape(group["wip"].shape[0],1)
         y = group["latency"]
 
-        data_dmatrix = xgb.DMatrix(data=X, label=y)
+        train_x, test_x, train_y, test_y = train_test_split(X, y, test_size=0.3, random_state=123)
 
-        # print(X.shape,y.shape)
+        xg_reg = xgb.XGBRegressor(objective ='reg:squarederror', colsample_bytree = 0.3, learning_rate = 0.1, max_depth = 5, alpha = 10, n_estimators = 10)
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=123)
-
-        xg_reg = xgb.XGBRegressor(objective ='reg:linear', colsample_bytree = 0.3, learning_rate = 0.1, max_depth = 5, alpha = 10, n_estimators = 10)
-
-        xg_reg.fit(X_train, y_train)
+        xg_reg.fit(train_x, train_y)
         outfile = open("../../models/api_metrics/new_model/xgb_" + name.replace("/", "_") + ".pkl", "wb")
         pkl.dump(xg_reg, outfile)
         outfile.close()
 
-        preds = xg_reg.predict(X_test)
+        pred_y = xg_reg.predict(test_x)
 
-        rmse = np.sqrt(np.mean(np.square(y_test - preds)))
-        # rmspe = (np.sqrt(np.mean(np.square((y_test - preds) / (y_test + EPSILON))))) * 100
-        # mae = np.mean(np.abs(y_test - preds))
-        loss.append(rmse)
+        rmse = np.sqrt(np.mean(np.square(test_y - pred_y)))
+        # mae = np.mean(np.abs(test_y - pred_y))
+        prediction_errors.append(rmse)
 
-        x = np.arange(0, group.wip.max() + 0.1 , 0.01)
-        y = xg_reg.predict(x.reshape(-1, 1))
-        test_preds_xgb[name] = y
 
-        # print(name, preds)
-
-        plt.scatter(group["wip"], group["latency"], label='data')
-        # plt.scatter(X_test["wip"], preds, label='test data')
-        plt.plot(x, y, 'r', label='ml curve')
-        plt.title(name)
-        plt.xlabel('wip')
-        plt.ylabel('latency')
-        plt.legend()
-        # plt.show()
-        # plt.savefig('../../Plots/ml_test_plots_mae_outliers_removed/' + name.replace("/", "_") + '_loss.png')
-        plt.close()
-
-    mean_loss = np.mean(loss)
-    median_loss = np.percentile(loss, 50)
-    percentile_loss = np.percentile(loss, 95)
+    mean_prediction_error = np.mean(prediction_errors)
+    median_prediction_error = np.percentile(prediction_errors, 50)
+    percentile95_prediction_error = np.percentile(prediction_errors, 95)
 
     print("-------Regression XGBoost--------")
-    print("\n".join([str(l) for l in loss]), "\n\n")
+    print("\n".join([str(l) for l in prediction_errors]), "\n\n")
 
-    print("Mean loss", mean_loss)
-    print("Median loss", median_loss)
-    print("95th percentile loss", percentile_loss)
+    print("Mean prediction_error", mean_prediction_error)
+    print("Median prediction_error", median_prediction_error)
+    print("95th percentile prediction_error", percentile95_prediction_error)
 
-    return mean_loss
+    return mean_prediction_error
+
 
 def evaluate_models():
+    prediction_errors = []
+
     for name, group in df:
-        # if (name not in high_loss_apis) and (name not in test_apis):
-        #     continue
 
         group = datasets.remove_outliers(group)
 
@@ -86,73 +61,44 @@ def evaluate_models():
 
         data_dmatrix = xgb.DMatrix(data=X, label=y)
 
-        # print(X.shape,y.shape)
-
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=123)
+        train_x, test_x, train_y, test_y = train_test_split(X, y, test_size=0.3, random_state=123)
 
         infile = open("../../models/api_metrics/new_model/xgb_" + name.replace("/", "_") + ".pkl", "rb")
         xg_reg = pkl.load(infile)
         infile.close()
 
-        preds = xg_reg.predict(X_test)
+        pred_y = xg_reg.predict(test_x)
 
-        rmse = np.sqrt(np.mean(np.square(y_test - preds)))
-        # rmspe = (np.sqrt(np.mean(np.square((y_test - preds) / (y_test + EPSILON))))) * 100
-        # mae = np.mean(np.abs(y_test - preds))
-        loss.append(rmse)
-
-        # evaluation using bucket method
-        error = []
-
-        for i in range(5):
-            test_sample = datasets.get_test_sample(X_test)
-            testY = test_sample["latency"] #/ maxLatency
-
-            predY = xg_reg.predict(X_test)
-            # mae = np.mean(np.abs(testY.values - predY))
-            rmse = np.sqrt(np.mean(np.square(testY.values - predY)))
-            error.append(rmse)
-
-            # print("test sample ", i, " ", test.shape, test_sample.shape, testY.mean(), mae)
-
-        avg_error = np.mean(error)
-        print("Loss: ", avg_error)
-        sample_loss.append(avg_error) # * maxLatency
+        rmse = np.sqrt(np.mean(np.square(test_y - pred_y)))
+        # mae = np.mean(np.abs(test_y - pred_y))
+        prediction_errors.append(rmse)
 
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
         y = xg_reg.predict(x.reshape(-1, 1))
-        test_preds_xgb[name] = y
-
-        # print(name, preds)
 
         plt.scatter(group["wip"], group["latency"], label='data')
-        # plt.scatter(X_test["wip"], preds, label='test data')
+        # plt.scatter(test_x["wip"], pred_y, label='test data')
         plt.plot(x, y, 'r', label='ml curve')
         plt.title(name)
         plt.xlabel('wip')
         plt.ylabel('latency')
         plt.legend()
-        # plt.show()
-        # plt.savefig('../../Plots/ml_test_plots_mae_outliers_removed/' + name.replace("/", "_") + '_loss.png')
+        plt.show()
+        # plt.savefig('../../Plots/ml_test_plots_mae_outliers_removed/' + name.replace("/", "_") + '.png')
         plt.close()
 
-    mean_loss = np.mean(loss)
-    median_loss = np.percentile(loss, 50)
-    percentile_loss = np.percentile(loss, 95)
-
-    mean_sample_loss = np.mean(sample_loss)
-    median_sample_loss = np.percentile(sample_loss, 50)
-    percentile_sample_loss = np.percentile(sample_loss, 95)
+    mean_prediction_error = np.mean(prediction_errors)
+    median_prediction_error = np.percentile(prediction_errors, 50)
+    percentile95_prediction_error = np.percentile(prediction_errors, 95)
 
     print("-------Regression XGBoost--------")
-    print("\n".join([str(l) for l in loss]), "\n\n")
-    print("\n".join([str(l) for l in sample_loss]), "\n\n")
+    print("\n".join([str(l) for l in prediction_errors]), "\n\n")
 
-    print("Mean loss/sample_loss", mean_loss, mean_sample_loss)
-    print("Median loss/sample_loss", median_loss, median_sample_loss)
-    print("95th percentile loss/sample_loss", percentile_loss, percentile_sample_loss)
+    print("Mean prediction_error", mean_prediction_error)
+    print("Median prediction_error", median_prediction_error)
+    print("95th percentile prediction_error", percentile95_prediction_error)
 
-    return mean_loss
+    return mean_prediction_error
 
 
 def predict(api, x):
@@ -165,10 +111,24 @@ def predict(api, x):
     return predictions
 
 
-def xgb_regression_forecast():
-    return test_preds_xgb
+def get_forecast():
+    xgb_predictions = {}
+    for name, group in df:
+
+        group = datasets.remove_outliers(group)
+
+        infile = open("../../models/api_metrics/54_xgb/xgb_" + name.replace("/", "_") + ".pkl", "rb")
+        model = pkl.load(infile)
+        infile.close()
+
+        # predictions for ml curve
+        x = np.arange(0, group.wip.max() + 0.1 , 0.01)
+        y = model.predict(x.reshape(-1, 1))
+        xgb_predictions[name] = y
+
+    return xgb_predictions
 
 # train_models()
-evaluate_models()
+# evaluate_models()
 # x = np.arange(0, 1000 + 0.1 , 0.01)
 # predict('ballerina/http/Client#delete#https://graph.microsoft.com', x.reshape(-1, 1))

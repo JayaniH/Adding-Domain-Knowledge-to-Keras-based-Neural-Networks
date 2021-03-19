@@ -18,23 +18,6 @@ def root_mean_squared_percentage_error(y_true, y_pred):
     EPSILON =  1e-6
     return (K.sqrt(K.mean(K.square((y_true - y_pred) / (y_true + EPSILON))))) * 100
 
-
-loss = []
-validation_loss = []
-prediction_loss = []
-sample_loss = []
-high_loss_apis = [
-    'ballerina/http/Client#post#http://hotel-mock-svc:8090',
-    'ballerina/http/Client#get#http://postman-echo.com',
-    'ballerina/http/Client#get#https://covidapi.info/api/v1',
-    'ballerina/http/Client#post#http://airline-mock-svc:8090',
-    'ballerina/http/Client#post#http://car-mock-svc:8090',
-    'ballerina/http/HttpClient#forward',
-    # 'ballerina/http/Caller#respond',
-    'ballerina/http/HttpClient#post',
-    'ballerina/http/HttpClient#get',
-    'ballerina/http/HttpCachingClient#post'
-]
 test_apis = [
     'ballerina/http/Client#get#https://ap15.salesforce.com',
     'ballerina/http/Client#post#https://ap15.salesforce.com',
@@ -42,246 +25,222 @@ test_apis = [
     'ballerinax/sfdc/QueryClient#getQueryResult',
     'ballerinax/sfdc/SObjectClient#createOpportunity'
 ]
+api = [
+    'ballerina/http/Client#forward#http://13.90.39.240:8601',
+    'ballerina/http/Client#forward#http://13.90.39.240:8602',
+    'ballerina/http/Client#forward#http://13.90.39.240:8688',
+    'ballerina/http/Client#forward#http://13.90.39.240:8702'
+]
 ml_predictions = {}
 
 # load data
-print("[INFO] loading data...")
+print('[INFO] loading data...')
 df = datasets.load_data()
 
 
+def train_model(api, df):
+
+    df = datasets.remove_outliers(df)
+
+    (train, test) = train_test_split(df, test_size=0.3, random_state=42)
+
+    train_y = train['latency'] 
+    test_y = test['latency'] 
+
+    scalerx = MinMaxScaler()
+
+    train_x = scalerx.fit_transform(train['wip'].values.reshape(-1,1))
+    test_x = scalerx.transform(test['wip'].values.reshape(-1,1))
+
+    # save scaler
+    outfile = open('../../models/api_metrics/new_model/_scalars/scaler_' + api.replace('/', '_') + '.pkl', 'wb')
+    pkl.dump(scalerx, outfile)
+    outfile.close()
+
+    model = models.create_model(train_x.shape[1])
+    opt = Adam(learning_rate=1e-3)
+    model.compile(loss=root_mean_squared_error, optimizer=opt)
+
+    print('[INFO] training model...')
+    history = model.fit(x=train_x, y=train_y, validation_data=(test_x, test_y), epochs=200, batch_size=4)
+
+    # save model
+    model.save('../../models/api_metrics/new_model/' + api.replace('/', '_'))
+    
+    training_loss = history.history['loss'][-1]
+    validation_loss = history.history['val_loss'][-1]
+
+    pred_y = model.predict(test_x)
+
+    # mae = np.mean(np.abs(test_y.values - pred_y))
+    rmse = np.sqrt(np.mean(np.square(test_y.values - pred_y)))
+
+    prediction_error = rmse
+
+    # predictions for ml curve
+    x = np.arange(0, df['wip'].max() + 0.1 , 0.01)
+    y = model.predict(scalerx.transform(x.reshape(-1, 1)))
+
+    # plot_curve(x, y, api, df)
+
+    return training_loss, validation_loss, prediction_error
+
+
+def evaluate_model(api, df):
+
+    df = datasets.remove_outliers(df)
+
+    infile = open('../../models/api_metrics/new_model/_scalars/scaler_' + api.replace('/', '_') + '.pkl', 'rb')
+    scalerx = pkl.load(infile)
+    infile.close()
+
+    (train, test) = train_test_split(df, test_size=0.3, random_state=42)
+
+    model = keras.models.load_model('../../models/api_metrics/new_model/' + api.replace('/', '_'), compile=False)
+    
+    # evaluation using bucket method
+    error = []
+
+    for i in range(5):
+        test_sample = datasets.get_test_sample(test)
+        test_x = scalerx.transform(test_sample['wip'].values.reshape(-1,1))
+        test_y = test_sample['latency']
+
+        pred_y = model.predict(test_x)
+
+        # mae = np.mean(np.abs(test_y.values - pred_y))
+        rmse = np.sqrt(np.mean(np.square(test_y.values - pred_y)))
+        error.append(rmse)
+
+    sample_error = np.mean(error)
+
+    # evaluation with entire test set
+    test_x = scalerx.transform(test['wip'].values.reshape(-1,1))
+    test_y = test['latency'] 
+
+    pred_y = model.predict(test_x)
+    
+    # mae = np.mean(np.abs(test_y.values - pred_y))
+    rmse = np.sqrt(np.mean(np.square(test_y.values - pred_y)))
+    prediction_error = rmse
+
+    # predictions for ml curve
+    x = np.arange(0, df['wip'].max() + 0.1 , 0.01)
+    y = model.predict(scalerx.transform(x.reshape(-1, 1)))
+
+    plot_curve(x, y, api, df)
+
+    return prediction_error, sample_error
+
+
+def plot_curve(x, y, api, df):
+    # plt.yscale('log')
+    plt.scatter(df['wip'], df['latency'], label='data')
+    plt.plot(x, y, 'r', label='ml curve')
+    plt.title(api)
+    plt.xlabel('wip')
+    plt.ylabel('latency')
+    plt.legend()
+    # plt.show()
+    plt.savefig('../../Plots/new_plots/' + api.replace('/', '_') + '.png')
+    plt.close()
+
+
+
 def train_models():
-    results_file = open("./results/ml_results.txt", "w")
+    training_losses = []
+    validation_losses = []
+    prediction_errors = []
 
     for name, group in df:
 
-        # if name == "ballerina/http/Caller#respond":
+        # if name == 'ballerina/http/Caller#respond':
         #     continue
 
-        # if name not in test_apis:
-        #     continue
-
-        group = datasets.remove_outliers(group)
-
-        # maxLatency = group["latency"].max()
-
-        print(name, "\n")
+        if name in api:
+            continue
         
-        results_file.write(name)
-        results_file.write("\n")
+        print(name, '\n')
 
-        print("[INFO] constructing training/testing split...")
-        (train, test) = train_test_split(group, test_size=0.3, random_state=42)
+        training_loss, validation_loss, prediction_error = train_model(name, group)
 
-        print("[INFO] processing data...")
+        training_losses.append(training_loss)
+        validation_losses.append(validation_loss)
+        prediction_errors.append(prediction_error)
 
-        #scale Y
-        trainY = train["latency"] #/ maxLatency
-        testY = test["latency"] #/ maxLatency
-    
-        # scale X
-        # (trainX, testX) = datasets.process_attributes(train, test)
+    mean_training_loss = np.mean(training_losses)
+    mean_val_loss = np.mean(validation_losses)
+    mean_prediction_error = np.mean(prediction_errors)
 
-        scalerx = MinMaxScaler()
+    median_training_loss = np.percentile(training_losses, 50)
+    median_val_loss = np.percentile(validation_losses, 50)
+    median_prediction_error = np.percentile(prediction_errors, 50)
 
-        trainX = scalerx.fit_transform(train["wip"].values.reshape(-1,1))
-        testX = scalerx.transform(test["wip"].values.reshape(-1,1))
+    percentile95_training_loss = np.percentile(training_losses, 95)
+    percentile95_val_loss = np.percentile(validation_losses, 95)
+    percentile95_prediction_error = np.percentile(prediction_errors, 95)
 
-        # save scaler
+    print('\n'.join([str(l) for l in training_losses]), '\n\n')
+    print('\n'.join([str(l) for l in validation_losses]), '\n\n')
+    print('\n'.join([str(l) for l in prediction_errors]), '\n\n')
 
-        outfile = open("../../models/52_ml_small_sample/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "wb")
-        pkl.dump(scalerx, outfile)
-        outfile.close()
-
-        model = models.create_model(trainX.shape[1])
-        opt = Adam(learning_rate=1e-2, decay=1e-3/200)
-        model.compile(loss=root_mean_squared_error, optimizer=opt)
-
-        print("[INFO] training model...")
-        history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4)
-
-        # save model
-        model.save('../../models/52_ml_small_sample/' + name.replace("/", "_"))
-        
-        # get final loss
-        loss.append(history.history['loss'][-1]) # * maxLatency
-        validation_loss.append(history.history['val_loss'][-1] ) # * maxLatency
-
-        # evaluation with entire test set
-        predY = model.predict(testX)
-        # mae = np.mean(np.abs(testY.values - predY))
-        rmse = np.sqrt(np.mean(np.square(testY.values - predY)))
-        prediction_loss.append(rmse) # * maxLatency
-
-        # evaluation using bucket method
-        error = []
-
-        for i in range(5):
-            test_sample = datasets.get_test_sample(test)
-            testX = scalerx.transform(test_sample["wip"].values.reshape(-1,1))
-            testY = test_sample["latency"] #/ maxLatency
-
-            predY = model.predict(testX)
-            # mae = np.mean(np.abs(testY.values - predY))
-            rmse = np.sqrt(np.mean(np.square(testY.values - predY)))
-            error.append(rmse)
-
-            # print("test sample ", i, " ", test.shape, test_sample.shape, testY.mean(), mae)
-
-        avg_error = np.mean(error)
-        print("Loss: ", avg_error)
-        sample_loss.append(avg_error) # * maxLatency
-
-        # record results
-        # print(history.history)
-        # results_file.write(str(history.history))
-        # results_file.write("\n\n")
-
-        #################################
-
-
-    mean_loss = np.mean(loss)
-    mean_val_loss = np.mean(validation_loss)
-    mean_prediction_loss = np.mean(prediction_loss)
-    mean_sample_loss = np.mean(sample_loss)
-
-    median_loss = np.percentile(loss, 50)
-    median_val_loss = np.percentile(validation_loss, 50)
-    median_prediction_loss = np.percentile(prediction_loss, 50)
-    median_sample_loss = np.percentile(sample_loss, 50)
-
-    percentile_loss = np.percentile(loss, 95)
-    percentile_val_loss = np.percentile(validation_loss, 95)
-    percentile_prediction_loss = np.percentile(prediction_loss, 95)
-    percentile_sample_loss = np.percentile(sample_loss, 95)
-
-    print("\n".join([str(l) for l in loss]), "\n\n")
-    print("\n".join([str(l) for l in validation_loss]), "\n\n")
-    print("\n".join([str(l) for l in prediction_loss]), "\n\n")
-    print("\n".join([str(l) for l in sample_loss]), "\n\n")
-
-    print("Mean loss/val_loss/prediction_loss/sample_loss", mean_loss, mean_val_loss, mean_prediction_loss, mean_sample_loss)
-    print("Median loss/val_loss/prediction_loss/sample_loss/", median_loss, median_val_loss, median_prediction_loss, median_sample_loss)
-    print("95th percentile loss/val_loss/prediction_loss/sample_loss", percentile_loss, percentile_val_loss, percentile_prediction_loss, percentile_sample_loss)
-
-    # results_file.write("\nMean loss/val_loss %s / %s" % (mean_loss, mean_val_loss)) 
-    # results_file.write("\n95th percentile loss/val_loss %s / %s" % (percentile_loss, percentile_val_loss)) 
-
-    results_file.write("\nloss")
-    results_file.write(str(loss))
-    results_file.write("\nval_loss")
-    results_file.write(str(validation_loss))
-    results_file.close()
+    print('Mean loss/val_loss/prediction_error', mean_training_loss, mean_val_loss, mean_prediction_error)
+    print('Median loss/val_loss/prediction_error', median_training_loss, median_val_loss, median_prediction_error)
+    print('95th percentile loss/val_loss/prediction_error', percentile95_training_loss, percentile95_val_loss, percentile95_prediction_error)
 
 
 def evaluate_models():
+    prediction_errors = []
+    sample_errors =[]
+
     for name, group in df:
 
-        # if name == "ballerina/http/Caller#respond":
-        #     continue
+        if name == 'ballerina/http/Caller#respond':
+            continue
 
         # if (name not in test_apis):
         #     continue
 
-        # print(group.latency.min())
+        prediction_error, sample_error = evaluate_model(name, group)
 
-        group = datasets.remove_outliers(group)
+        prediction_errors.append(prediction_error)
+        sample_errors.append(sample_error)
 
-        # maxLatency = group["latency"].max()
+    mean_prediction_error = np.mean(prediction_errors)
+    mean_sample_error = np.mean(sample_errors)
 
-        infile = open("../../models/5_ml_rmse/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "rb")
-        scalerx = pkl.load(infile)
-        infile.close()
+    median_prediction_error = np.percentile(prediction_errors, 50)
+    median_sample_error = np.percentile(sample_errors, 50)
 
-        (train, test) = train_test_split(group, test_size=0.3, random_state=42)
+    percentile95_prediction_error = np.percentile(prediction_errors, 95)
+    percentile95_sample_error = np.percentile(sample_errors, 95)
 
-        model = keras.models.load_model('../../models/5_ml_rmse/' + name.replace("/", "_"), compile=False)
+    print('\n'.join([str(l) for l in prediction_errors]), '\n\n')
+    print('\n'.join([str(l) for l in sample_errors]), '\n\n')
 
-        # preds for ml curve
-        x = np.arange(0, group.wip.max() + 0.1 , 0.01)
-        preds = model.predict(scalerx.transform(x.reshape(-1, 1)))
-        preds = preds # * maxLatency
-
-        # print(name, preds)
-
-        # evaluation with entire test set
-        testX = scalerx.transform(test["wip"].values.reshape(-1,1))
-        testY = test["latency"] # / maxLatency
-
-        predY = model.predict(testX)
-        pred_y = predY # * maxLatency
-        # mae = np.mean(np.abs(testY.values - predY))
-        rmse = np.sqrt(np.mean(np.square(testY.values - predY)))
-        prediction_loss.append(rmse) # * maxLatency
-        
-        # evaluation using bucket method
-        error = []
-
-        for i in range(5):
-            test_sample = datasets.get_test_sample(test)
-            testX = scalerx.transform(test_sample["wip"].values.reshape(-1,1))
-            testY = test_sample["latency"] # / maxLatency
-
-            predY = model.predict(testX)
-            # mae = np.mean(np.abs(testY.values - predY))
-            rmse = np.sqrt(np.mean(np.square(testY.values - predY)))
-            error.append(rmse)
-
-            # print("test sample ", i, " ", test.shape, test_sample.shape, testY.mean(), mae)
-
-        avg_error = np.mean(error)
-        print("Sample Loss: ", avg_error)
-        sample_loss.append(avg_error) # maxLatency
-
-        # plt.yscale("log")
-        plt.scatter(group.wip, group.latency, label='data')
-        plt.scatter(test["wip"], pred_y, label='test data')
-        plt.plot(x, preds, 'r', label='ml curve')
-        plt.title(name)
-        plt.xlabel('wip')
-        plt.ylabel('latency')
-        plt.legend()
-        # plt.show()
-        # plt.savefig('../../Plots/ml_test_plots_mae_outliers_removed/' + name.replace("/", "_") + '_loss.png')
-        plt.close()
-
-    mean_prediction_loss = np.mean(prediction_loss)
-    mean_sample_loss = np.mean(sample_loss)
-
-    median_prediction_loss = np.percentile(prediction_loss, 50)
-    median_sample_loss = np.percentile(sample_loss, 50)
-
-    percentile_prerdiction_loss = np.percentile(prediction_loss, 95)
-    percentile_sample_loss = np.percentile(sample_loss, 95)
-
-    print("\n".join([str(l) for l in prediction_loss]), "\n\n")
-    print("\n".join([str(l) for l in sample_loss]), "\n\n")
-
-    print("Mean prediction_loss/sample_loss", mean_prediction_loss, mean_sample_loss)
-    print("Median loss/prediction_loss/sample_loss", median_prediction_loss, median_sample_loss)
-    print("95th percentile prediction_loss/sample_loss", percentile_prerdiction_loss, percentile_sample_loss)
+    print('Mean prediction_error/sample_error', mean_prediction_error, mean_sample_error)
+    print('Median loss/prediction_error/sample_error', median_prediction_error, median_sample_error)
+    print('95th percentile prediction_error/sample_error', percentile95_prediction_error, percentile95_sample_error)
 
 
 
-def get_ml_model_forecasts():
+def get_forecasts():
     for name, group in df:
 
         group = datasets.remove_outliers(group)
-        # maxLatency = group["latency"].max()
 
-        infile = open("../../models/12_ml_epoch200_batch4_rmse_ouliers_removed_unscaledY/_scalars/scaler_" + name.replace("/", "_") + ".pkl", "rb")
-        scalerx = pkl.load(infile)
+        infile = open('../../models/api_metrics/12_regression_epoch200_batch4_rmse_ouliers_removed_unscaledY/_scalars/scaler_' + name.replace('/', '_') + '.pkl', 'rb')
+        scaler = pkl.load(infile)
         infile.close()
 
-        model = keras.models.load_model('../../models/12_ml_epoch200_batch4_rmse_ouliers_removed_unscaledY/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../../models/api_metrics/12_regression_epoch200_batch4_rmse_ouliers_removed_unscaledY/' + name.replace('/', '_'), compile=False)
 
-        # preds for ml curve
-        x = np.arange(0, group.wip.max() + 0.1 , 0.01)
-        preds = model.predict(scalerx.transform(x.reshape(-1, 1)))
-        preds = preds # * maxLatency
-        ml_predictions[name] = preds
+        # predictions for ml curve
+        x = np.arange(0, group['wip'].max() + 0.1 , 0.01)
+        y = model.predict(scaler.transform(x.reshape(-1, 1)))
+        ml_predictions[name] = y
 
-        # print(name, preds)
     return ml_predictions
 
-train_models()
-# evaluate_models()
+# train_models()
+evaluate_models()

@@ -274,5 +274,5 @@ def get_ml_with_custom_loss_forecasts():
     return ml_with_custom_loss_predictions
 
 
-train_models()
+# train_models()
 # evaluate_models()
