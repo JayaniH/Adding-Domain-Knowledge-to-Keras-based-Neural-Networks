@@ -43,7 +43,7 @@ print("[INFO] loading data...")
 df = datasets.load_data()
 
 # fit domain model parameters
-domain_model_parameters = domain_model.fit_parameters_and_evaluate()
+domain_model_parameters = domain_model.create_models()
 
 def train_models():
 

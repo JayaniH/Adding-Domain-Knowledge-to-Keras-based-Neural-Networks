@@ -63,7 +63,7 @@ def evaluate_models():
 
         train_x, test_x, train_y, test_y = train_test_split(X, y, test_size=0.3, random_state=123)
 
-        infile = open("../../models/api_metrics/new_model/xgb_" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../../models/api_metrics/2_xgb/xgb_" + name.replace("/", "_") + ".pkl", "rb")
         xg_reg = pkl.load(infile)
         infile.close()
 
@@ -102,7 +102,7 @@ def evaluate_models():
 
 
 def predict(api, x):
-    infile = open("../../models/api_metrics/new_model/xgb_" + api.replace("/", "_") + ".pkl", "rb")
+    infile = open("../../models/api_metrics/2_xgb/xgb_" + api.replace("/", "_") + ".pkl", "rb")
     model = pkl.load(infile)
     infile.close()
 
@@ -117,7 +117,7 @@ def get_forecast():
 
         group = datasets.remove_outliers(group)
 
-        infile = open("../../models/api_metrics/54_xgb/xgb_" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../../models/api_metrics/2_xgb/xgb_" + name.replace("/", "_") + ".pkl", "rb")
         model = pkl.load(infile)
         infile.close()
 
@@ -130,5 +130,3 @@ def get_forecast():
 
 # train_models()
 # evaluate_models()
-# x = np.arange(0, 1000 + 0.1 , 0.01)
-# predict('ballerina/http/Client#delete#https://graph.microsoft.com', x.reshape(-1, 1))

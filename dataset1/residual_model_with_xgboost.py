@@ -179,13 +179,13 @@ def evaluate_models():
         group["xgb_latency"] = xgb.predict(name, group["wip"].values.reshape(-1, 1))
         group["residuals"] = group["xgb_latency"] - group["latency"]
 
-        infile = open("../../models/api_metrics/new_model_res/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../../models/api_metrics/14_residual_with_xgb_rmse/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
         scalerX = pkl.load(infile)
         infile.close()
 
         (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
-        model = keras.models.load_model('../../models/api_metrics/new_model_res/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../../models/api_metrics/14_residual_with_xgb_rmse/' + name.replace("/", "_"), compile=False)
 
         # preds for ml curve
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)

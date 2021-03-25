@@ -108,7 +108,7 @@ def evaluate_models():
         trainX = train["wip"].values.reshape(-1,1)
         testX = test["wip"].values.reshape(-1,1)
 
-        infile = open("../../models/api_metrics/new_model/" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../../models/api_metrics/18_linear_regression/" + name.replace("/", "_") + ".pkl", "rb")
         model = pkl.load(infile)
         infile.close()
 
@@ -173,7 +173,7 @@ def evaluate_models():
 
 
 def predict(api, x):
-    infile = open("../../models/api_metrics/new_model/" + api.replace("/", "_") + ".pkl", "rb")
+    infile = open("../../models/api_metrics/18_linear_regression/" + api.replace("/", "_") + ".pkl", "rb")
     model = pkl.load(infile)
     infile.close()
 

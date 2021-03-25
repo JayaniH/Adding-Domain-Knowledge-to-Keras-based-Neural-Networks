@@ -12,39 +12,23 @@ import _helpers
 import numpy as np
 import pandas as pd
 import pickle as pkl
-# import keras
 
-
-class AccuracyStopping(keras.callbacks.Callback):
-    def __init__(self, loss_threshold):
-        super(AccuracyStopping, self).__init__()
-        self._loss_threshold = loss_threshold
-
-    def on_epoch_end(self, batch, logs={}):
-        train_loss = logs.get('val_loss')
-        if train_loss <= self._loss_threshold:
-            self.model.stop_training = True
-        
 
 def root_mean_squared_error(y_true, y_pred):
     return K.sqrt(K.mean(K.square(y_pred - y_true)))
 
-
-apis = [
-    'miyurud/microsoft_sheets/Workbook#createWorksheet'
-]
 
 # load data
 print('[INFO] loading data...')
 df = datasets.load_data()
 
 
-def train_model(api, df):
+def train_model(train_i, test_i, i, api, df):
 
-    df = datasets.remove_outliers(df)
+    # df = datasets.remove_outliers(df)
 
-    print("[INFO] constructing training/testing split...")
-    (train, test) = train_test_split(df, test_size=0.3, random_state=42)
+    train = df.iloc[train_i]
+    test = df.iloc[test_i]
 
     train_y = train['latency'] 
     test_y = test['latency'] 
@@ -55,7 +39,7 @@ def train_model(api, df):
     test_x = scalerx.transform(test['wip'].values.reshape(-1,1))
 
     # save scaler
-    outfile = open('../../models/api_metrics/new_model/_scalars/scaler_' + api.replace('/', '_') + '.pkl', 'wb')
+    outfile = open('../../models/api_metrics/new_model/_scalars/scaler_' + api.replace('/', '_') + str(i+1) +'.pkl', 'wb')
     pkl.dump(scalerx, outfile)
     outfile.close()
 
@@ -63,14 +47,13 @@ def train_model(api, df):
     opt = Adam(learning_rate=1e-2)
     model.compile(loss='mean_absolute_error', optimizer=opt)
 
-    loss_callback = AccuracyStopping(1)
-    es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=25)
-
+    es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=50)
+    
     print('[INFO] training model...')
-    history = model.fit(x=train_x, y=train_y, validation_data=(test_x, test_y), epochs=20000, batch_size=32 if train_x.shape[0] > 32 else 4, callbacks=[es])
+    history = model.fit(x=train_x, y=train_y, validation_data=(test_x, test_y), epochs=10000, batch_size=32 if train_x.shape[0] > 32 else 4, callbacks=[es])
 
     # save model
-    model.save('../../models/api_metrics/new_model/' + api.replace('/', '_'))
+    model.save('../../models/api_metrics/new_model/' + api.replace('/', '_') + str(i+1))
     
     training_loss = history.history['loss'][-1]
     validation_loss = history.history['val_loss'][-1]
@@ -86,22 +69,23 @@ def train_model(api, df):
     x = np.arange(0, df['wip'].max() + 0.1 , 0.01)
     y = model.predict(scalerx.transform(x.reshape(-1, 1)))
 
-    plot_curve(x, y, api, df)
+    # plot_curve(x, y, api, df)
 
     return training_loss, validation_loss, prediction_error
 
 
-def evaluate_model(api, df):
+def evaluate_model(train_i, test_i, i, api, df):
 
-    df = datasets.remove_outliers(df)
+    # df = datasets.remove_outliers(df)
 
-    infile = open('../../models/api_metrics/models_combined/_scalars/scaler_' + api.replace('/', '_') + '.pkl', 'rb')
+    infile = open('../../models/api_metrics/new_model/_scalars/scaler_' + api.replace('/', '_') + str(i+1) + '.pkl', 'rb')
     scalerx = pkl.load(infile)
     infile.close()
 
-    (train, test) = train_test_split(df, test_size=0.3, random_state=42)
+    train = df.iloc[train_i]
+    test = df.iloc[test_i]
 
-    model = keras.models.load_model('../../models/api_metrics/models_combined/' + api.replace('/', '_'), compile=False)
+    model = keras.models.load_model('../../models/api_metrics/new_model/' + api.replace('/', '_') + str(i+1), compile=False)
     
     # evaluation using bucket method
     error = []
@@ -133,7 +117,7 @@ def evaluate_model(api, df):
     x = np.arange(0, df['wip'].max() + 0.1 , 0.01)
     y = model.predict(scalerx.transform(x.reshape(-1, 1)))
 
-    plot_curve(x, y, api, df)
+    # plot_curve(x, y, api, df)
 
     return prediction_error, sample_error
 
@@ -151,6 +135,51 @@ def plot_curve(x, y, api, df):
     plt.close()
 
 
+def train_with_cross_validation(api, df):
+    errors = {'training' : [], 'validation': [], 'prediction': []}
+
+    df = datasets.remove_outliers(df)
+
+    print('[INFO] constructing k fold split...')
+    kf = KFold(n_splits=5, shuffle = True, random_state=14)
+    i = 0
+
+    for train_i, test_i in kf.split(df):
+        print('--------------------------------------------------------------------------------------------------------------------------------')
+        print('K', str(i+1), '\n')
+        training_loss, validation_loss, prediction_error = train_model(train_i, test_i, i, api, df)
+        errors['training'].append(training_loss)
+        errors['validation'].append(validation_loss)
+        errors['prediction'].append(prediction_error)
+        i += 1
+
+    mean_trainng_loss, mean_val_loss, mean_prediction_error = _helpers.print_errors(errors)
+
+    return mean_trainng_loss, mean_val_loss, mean_prediction_error
+
+
+def evaluate_with_cross_validation(api, df):
+    errors = {'prediction' : [], 'sample': []}
+
+    df = datasets.remove_outliers(df)
+    
+    print('[INFO] constructing k fold split...')
+    kf = KFold(n_splits=5, shuffle = True, random_state=14)
+    i = 0
+
+    for train_i, test_i in kf.split(df):
+        print('--------------------------------------------------------------------------------------------------------------------------------')
+        print('\nK', i+1)
+        prediction_error, sample_error = evaluate_model(train_i, test_i, i, api, df)
+        errors['prediction'].append(prediction_error)
+        errors['sample'].append(sample_error)
+        i += 1
+
+    mean_prediction_error, mean_sample_error = _helpers.print_errors_eval(errors)
+
+    return errors, mean_prediction_error, mean_sample_error
+
+
 def train_models():
     training_losses = []
     validation_losses = []
@@ -160,17 +189,15 @@ def train_models():
 
         # if name == 'ballerina/http/Caller#respond':
         #     continue
-
-        if name not in apis:
-            continue
         
         print(name, '\n')
 
-        training_loss, validation_loss, prediction_error = train_model(name, group)
+        training_loss, validation_loss, prediction_error = train_with_cross_validation(name, group)
 
         training_losses.append(training_loss)
         validation_losses.append(validation_loss)
         prediction_errors.append(prediction_error)
+
 
     mean_training_loss = np.mean(training_losses)
     mean_val_loss = np.mean(validation_losses)
@@ -194,6 +221,7 @@ def train_models():
 
 
 def evaluate_models():
+    kfold = {'k1': [], 'k2': [], 'k3': [], 'k4': [], 'k5': []}
     prediction_errors = []
     sample_errors =[]
 
@@ -201,7 +229,13 @@ def evaluate_models():
         # if name == 'ballerina/http/Caller#respond':
         #     continue
 
-        prediction_error, sample_error = evaluate_model(name, group)
+        errors, prediction_error, sample_error = evaluate_with_cross_validation(name, group)
+        [k1, k2, k3, k4, k5] = errors['prediction']
+        kfold['k1'].append(k1)
+        kfold['k2'].append(k2)
+        kfold['k3'].append(k3)
+        kfold['k4'].append(k4)
+        kfold['k5'].append(k5)
 
         prediction_errors.append(prediction_error)
         sample_errors.append(sample_error)
@@ -214,6 +248,8 @@ def evaluate_models():
 
     percentile95_prediction_error = np.percentile(prediction_errors, 95)
     percentile95_sample_error = np.percentile(sample_errors, 95)
+
+    _helpers.print_kfold(kfold)
 
     print('\n'.join([str(l) for l in prediction_errors]), '\n\n')
     print('\n'.join([str(l) for l in sample_errors]), '\n\n')
@@ -231,11 +267,11 @@ def get_forecasts():
 
         group = datasets.remove_outliers(group)
 
-        infile = open('../../models/api_metrics/models_combined/_scalars/scaler_' + name.replace('/', '_') + '.pkl', 'rb')
+        infile = open('../../models/api_metrics/1_ml_model/_scalars/scaler_' + name.replace('/', '_') + '.pkl', 'rb')
         scaler = pkl.load(infile)
         infile.close()
 
-        model = keras.models.load_model('../../models/api_metrics/models_combined/' + name.replace('/', '_'), compile=False)
+        model = keras.models.load_model('../../models/api_metrics/1_ml_model/' + name.replace('/', '_'), compile=False)
 
         # predictions for ml curve
         x = np.arange(0, group['wip'].max() + 0.1 , 0.01)
@@ -245,4 +281,4 @@ def get_forecasts():
     return ml_predictions
 
 # train_models()
-# evaluate_models()
+evaluate_models()

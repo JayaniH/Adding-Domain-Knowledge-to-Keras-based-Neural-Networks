@@ -11,16 +11,6 @@ import domain_model3 as domain_model
 import numpy as np
 import pickle as pkl
 
-
-test_apis = [
-    'ballerina/http/Client#get#https://ap15.salesforce.com',
-    'ballerina/http/Client#post#https://ap15.salesforce.com',
-    'ballerina/http/Client#post#https://login.salesforce.com/services/oauth2/token',
-    'ballerinax/sfdc/QueryClient#getQueryResult',
-    'ballerinax/sfdc/SObjectClient#createOpportunity'
-]
-residual_models_predictions = {}
-
 # load data
 print('[INFO] loading data...')
 df = datasets.load_data()
@@ -52,7 +42,7 @@ def train_model(api, df):
     test_x = scalerX.transform(test['wip'].values.reshape(-1,1))
 
     # save scaler X
-    outfile = open('../../models/api_metrics/new_model/_scalars/scaler_' + api.replace('/', '_') + '.pkl', 'wb')
+    outfile = open('../../models/api_metrics/new_model/_scalars/scalerX' + api.replace('/', '_') + '.pkl', 'wb')
     pkl.dump(scalerX, outfile)
     outfile.close()
 
@@ -84,13 +74,13 @@ def evaluate_model(api, df):
 
     df['domain_latency'] = domain_model.predict(api, df['wip'], domain_model_parameters[api])
 
-    infile = open('../../models/api_metrics/new_model/_scalars/scaler_' + api.replace('/', '_') + '.pkl', 'rb')
+    infile = open('../../models/api_metrics/12_regression_approximation_mean_3std_1_regularization_01/_scalars/scalerX' + api.replace('/', '_') + '.pkl', 'rb')
     scalerX = pkl.load(infile)
     infile.close()
 
     (train, test) = train_test_split(df, test_size=0.3, random_state=42)
 
-    model = keras.models.load_model('../../models/api_metrics/new_model/' + api.replace('/', '_'), compile=False)
+    model = keras.models.load_model('../../models/api_metrics/12_regression_approximation_mean_3std_1_regularization_01/' + api.replace('/', '_'), compile=False)
 
     # evaluation using bucket method
     pred_error = []
@@ -123,7 +113,7 @@ def evaluate_model(api, df):
     x = np.arange(0, df['wip'].max() + 0.1 , 0.01)
     y = model.predict(scalerX.transform(x.reshape(-1, 1)))
 
-    plot_curve(x, y, api, df)
+    # plot_curve(x, y, api, df)
 
     return prediction_error, sample_error
 
@@ -146,12 +136,6 @@ def train_models():
     prediction_errors = []
 
     for name, group in df:
-
-        # if name == 'ballerina/http/Caller#respond':
-        #     continue
-
-        if name not in test_apis:
-            continue
 
         print(name, '\n')
 
@@ -186,13 +170,6 @@ def evaluate_models():
     sample_errors = []
 
     for name, group in df:
-
-        # if name == 'ballerina/http/Caller#respond':
-        #     continue
-
-        if (name not in test_apis):
-            continue
-    
             
         prediction_error, sample_error = evaluate_model(name, group)
         prediction_errors.append(prediction_error)
@@ -224,13 +201,13 @@ def get_forecasts():
 
         group["domain_latency"] = domain_model.predict(name, group["wip"], domain_model_parameters[name])
 
-        infile = open("../../models/api_metrics/45_regression_approximation_mean_3std_1_regularization_01/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../../models/api_metrics/12_regression_approximation_mean_3std_1_regularization_01/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
         scalerX = pkl.load(infile)
         infile.close()
 
         (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
-        model = keras.models.load_model('../../models/api_metrics/45_regression_approximation_mean_3std_1_regularization_01/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../../models/api_metrics/12_regression_approximation_mean_3std_1_regularization_01/' + name.replace("/", "_"), compile=False)
 
         # preds for ml curve
         x = np.arange(0, group["wip"].max() + 0.1 , 0.01)
@@ -241,4 +218,4 @@ def get_forecasts():
 
 
 # train_models()
-# evaluate_models() 
+evaluate_models() 

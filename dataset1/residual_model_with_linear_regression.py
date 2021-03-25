@@ -184,7 +184,7 @@ def evaluate_models():
 
         (train, test) = train_test_split(group, test_size=0.3, random_state=42)
 
-        model = keras.models.load_model('../../models/api_metrics/new_model_res/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../../models/api_metrics/20_residual_model_with_linear_regression_rmse/' + name.replace("/", "_"), compile=False)
 
         # preds for ml curve
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
@@ -294,11 +294,11 @@ def get_residual_model_forecasts():
         group["regression_latency"] = linear_regression_model.predict(name, group["wip"].values.reshape(-1, 1))
         group["residuals"] = group["regression_latency"] - group["latency"]
 
-        infile = open("../../models/10_residual_rmse/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
+        infile = open("../../models/20_residual_model_with_linear_regression_rmse/_scalars/scalerX" + name.replace("/", "_") + ".pkl", "rb")
         scalerX = pkl.load(infile)
         infile.close()
 
-        model = keras.models.load_model('../../models/10_residual_rmse/' + name.replace("/", "_"), compile=False)
+        model = keras.models.load_model('../../models/20_residual_model_with_linear_regression_rmse/' + name.replace("/", "_"), compile=False)
 
         x = np.arange(0, group.wip.max() + 0.1 , 0.01)
         regression_latency = linear_regression_model.predict(name, x.reshape(-1, 1))
