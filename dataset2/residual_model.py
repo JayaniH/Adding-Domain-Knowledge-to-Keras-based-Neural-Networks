@@ -92,13 +92,13 @@ def evaluate_model(i):
     df['domain_prediction'] = domain_model.predict(df['concurrent_users'], domain_model_parameters)
     df['residuals'] = df['domain_prediction'] - df['avg_response_time']
 
-    infile = open('../../models/api_manager/new_model/_scalars/scalerX_' + str(i+1) +'.pkl', 'rb')
+    infile = open('../../models/api_manager/11_residual_model_outlier_removed/_scalars/scalerX_' + str(i+1) +'.pkl', 'rb')
     scalerX = pkl.load(infile)
     infile.close()
 
     (train, test) = train_test_split(df, test_size=0.3, random_state=seed)
 
-    model = keras.models.load_model('../../models/api_manager/new_model/case' + str(i+1), compile=False)
+    model = keras.models.load_model('../../models/api_manager/11_residual_model_outlier_removed/case' + str(i+1), compile=False)
 
     # preds for dataset
     testX = scalerX.transform(test[['scenario_passthrough', 'scenario_transformation', 'msg_size', 'concurrent_users']].values.reshape(-1,4))

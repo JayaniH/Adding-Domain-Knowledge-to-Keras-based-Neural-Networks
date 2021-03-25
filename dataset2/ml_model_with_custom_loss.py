@@ -93,13 +93,13 @@ def evaluate_model(i):
     domain_model_parameters, _ = domain_model.create_model(df, i)
     df['domain_prediction'] = domain_model.predict(df['concurrent_users'], domain_model_parameters)
 
-    infile = open('../../models/api_manager/new_model/_scalars/scalerX_' + str(i+1) +'.pkl', 'rb')
+    infile = open('../../models/api_manager/15_regression_with_custom_loss_1_outlier_removed/_scalars/scalerX_' + str(i+1) +'.pkl', 'rb')
     scalerX = pkl.load(infile)
     infile.close()
 
     (train, test) = train_test_split(df, test_size=0.3, random_state=seed)
 
-    model = keras.models.load_model('../../models/api_manager/new_model/case' + str(i+1), compile=False)
+    model = keras.models.load_model('../../models/api_manager/15_regression_with_custom_loss_1_outlier_removed/case' + str(i+1), compile=False)
 
 
     # preds for dataset
