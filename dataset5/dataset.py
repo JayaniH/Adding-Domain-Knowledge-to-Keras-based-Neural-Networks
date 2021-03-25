@@ -35,8 +35,8 @@ def remove_outliers(df):
         windowed_df = df[(df['concurrent_users']>(i - window_size)) & (df['concurrent_users']<=(i))]
         if len(windowed_df)>2:
             x0 = np.median(windowed_df['latency'])
-            S0 = k * np.median(np.abs(windowed_df['latency'] - x0))         # median absolute deviation
-            # S0 = windowed_df['latency'].std()                             # standard deviation
+            # S0 = k * np.median(np.abs(windowed_df['latency'] - x0))         # median absolute deviation
+            S0 = windowed_df['latency'].std()                             # standard deviation
             filtered_window = windowed_df[np.abs(windowed_df['latency'] - x0) < n_sigma * S0]
             outlier_window = pd.concat([windowed_df,filtered_window]).drop_duplicates(keep=False)
             filtered_df = filtered_df.append([filtered_window], ignore_index=True)
