@@ -231,11 +231,11 @@ def get_forecasts():
 
         group = datasets.remove_outliers(group)
 
-        infile = open('../../models/api_metrics/models_combined/_scalars/scaler_' + name.replace('/', '_') + '.pkl', 'rb')
+        infile = open('../../models/api_metrics/25_ml_models_trained_separetely/_scalars/scaler_' + name.replace('/', '_') + '.pkl', 'rb')
         scaler = pkl.load(infile)
         infile.close()
 
-        model = keras.models.load_model('../../models/api_metrics/models_combined/' + name.replace('/', '_'), compile=False)
+        model = keras.models.load_model('../../models/api_metrics/25_ml_models_trained_separetely/' + name.replace('/', '_'), compile=False)
 
         # predictions for ml curve
         x = np.arange(0, group['wip'].max() + 0.1 , 0.01)

@@ -3,10 +3,11 @@ from tensorflow import keras
 from keras import backend as K
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.optimizers import Adam
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold
 from sklearn.preprocessing import MinMaxScaler
 import datasets
 import models
+import _helpers
 import domain_model3 as domain_model
 import numpy as np
 import pickle as pkl
@@ -24,14 +25,16 @@ df = datasets.load_data()
 # fit domain model parameters
 domain_model_parameters = domain_model.create_models()
 
-def train_model(api, df):
+def train_model(train_i, test_i, i, api, df):
 
-    df = datasets.remove_outliers(df)
+    # df = datasets.remove_outliers(df)
     
     df['domain_latency'] = domain_model.predict(api, df['wip'], domain_model_parameters[api])
     df['residuals'] = df['domain_latency'] - df['latency']
 
-    (train, test) = train_test_split(df, test_size=0.3, random_state=42)
+    train = df.iloc[train_i]
+    test = df.iloc[test_i]
+
 
     train_y = train['residuals']
     test_y = test['residuals']
@@ -41,7 +44,7 @@ def train_model(api, df):
     test_x = scalerX.transform(test['wip'].values.reshape(-1,1))
 
     # save scaler X
-    outfile = open('../../models/api_metrics/new_model/_scalars/scalerX' + api.replace('/', '_') + '.pkl', 'wb')
+    outfile = open('../../models/api_metrics/new_model/_scalars/scalerX' + api.replace('/', '_') + str(i+1) +'.pkl', 'wb')
     pkl.dump(scalerX, outfile)
     outfile.close()
 
@@ -52,10 +55,10 @@ def train_model(api, df):
     es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=25)
 
     print('[INFO] training model...')
-    history = model.fit(x=train_x, y=train_y, validation_data=(test_x, test_y), epochs=10000, batch_size=32 if train_x.shape[0] > 32 else 4, callbacks=[es])
+    history = model.fit(x=train_x, y=train_y, validation_data=(test_x, test_y), epochs=200, batch_size=32 if train_x.shape[0] > 32 else 4)
 
     # save model
-    model.save('../../models/api_metrics/new_model/' + api.replace('/', '_'))
+    model.save('../../models/api_metrics/new_model/' + api.replace('/', '_') + str(i+1))
 
     training_loss = history.history['loss'][-1]
     validation_loss = history.history['val_loss'][-1]
@@ -74,19 +77,20 @@ def train_model(api, df):
 
     return training_loss, validation_loss, prediction_error
 
-def evaluate_model(api, df):
-    df = datasets.remove_outliers(df)
+def evaluate_model(train_i, test_i, i, api, df):
+    # df = datasets.remove_outliers(df)
 
     df['domain_latency'] = domain_model.predict(api, df['wip'], domain_model_parameters[api])
     df['residuals'] = df['domain_latency'] - df['latency']
 
-    infile = open('../../models/api_metrics/new_model/_scalars/scalerX' + api.replace('/', '_') + '.pkl', 'rb')
+    infile = open('../../models/api_metrics/new_model/_scalars/scalerX' + api.replace('/', '_') + str(i+1) + '.pkl', 'rb')
     scalerX = pkl.load(infile)
     infile.close()
 
-    (train, test) = train_test_split(df, test_size=0.3, random_state=42)
+    train = df.iloc[train_i]
+    test = df.iloc[test_i]
 
-    model = keras.models.load_model('../../models/api_metrics/new_model/' + api.replace('/', '_'), compile=False)
+    model = keras.models.load_model('../../models/api_metrics/new_model/' + api.replace('/', '_') + str(i+1), compile=False)
 
     # predictions for test set
     test_x = scalerX.transform(test['wip'].values.reshape(-1,1))
@@ -154,6 +158,50 @@ def plot_curve(x, y, domain_latency, api, df):
     plt.savefig('../../Plots/new_plots/' + api.replace('/', '_') + '_loss.png')
     plt.close()
 
+def train_with_cross_validation(api, df):
+    errors = {'training' : [], 'validation': [], 'prediction': []}
+
+    df = datasets.remove_outliers(df)
+
+    print('[INFO] constructing k fold split...')
+    kf = KFold(n_splits=5, shuffle = True, random_state=14)
+    i = 0
+
+    for train_i, test_i in kf.split(df):
+        print('--------------------------------------------------------------------------------------------------------------------------------')
+        print('K', str(i+1), '\n')
+        training_loss, validation_loss, prediction_error = train_model(train_i, test_i, i, api, df)
+        errors['training'].append(training_loss)
+        errors['validation'].append(validation_loss)
+        errors['prediction'].append(prediction_error)
+        i += 1
+
+    mean_trainng_loss, mean_val_loss, mean_prediction_error = _helpers.print_errors(errors)
+
+    return mean_trainng_loss, mean_val_loss, mean_prediction_error
+
+
+def evaluate_with_cross_validation(api, df):
+    errors = {'prediction' : [], 'sample': []}
+
+    df = datasets.remove_outliers(df)
+    
+    print('[INFO] constructing k fold split...')
+    kf = KFold(n_splits=5, shuffle = True, random_state=14)
+    i = 0
+
+    for train_i, test_i in kf.split(df):
+        print('--------------------------------------------------------------------------------------------------------------------------------')
+        print('\nK', i+1)
+        prediction_error, sample_residual_error, sample_prediction_error = evaluate_model(train_i, test_i, i, api, df)
+        errors['prediction'].append(prediction_error)
+        errors['sample'].append(sample_prediction_error)
+        i += 1
+
+    mean_prediction_error, mean_sample_error = _helpers.print_errors_eval(errors)
+
+    return errors, mean_prediction_error, mean_sample_error
+
 
 def train_models():
     training_losses = []
@@ -163,7 +211,7 @@ def train_models():
     for name, group in df:
 
         print(name, '\n')
-        training_loss, validation_loss, prediction_error = train_model(name, group)
+        training_loss, validation_loss, prediction_error = train_with_cross_validation(name, group)
 
         training_losses.append(training_loss)
         validation_losses.append(validation_loss)
@@ -194,65 +242,43 @@ def train_models():
 
 
 def evaluate_models():
+    kfold = {'k1': [], 'k2': [], 'k3': [], 'k4': [], 'k5': []}
     prediction_errors = []
-    sample_residual_errors = []
     sample_prediction_errors =[]
+
     for name, group in df:
 
-        prediction_error, sample_residual_error, sample_prediction_error = evaluate_model(name, group)
+        errors, prediction_error, sample_prediction_error = evaluate_with_cross_validation(name, group)
+        [k1, k2, k3, k4, k5] = errors['prediction']
+        kfold['k1'].append(k1)
+        kfold['k2'].append(k2)
+        kfold['k3'].append(k3)
+        kfold['k4'].append(k4)
+        kfold['k5'].append(k5)
+
         prediction_errors.append(prediction_error)
-        sample_residual_errors.append(sample_residual_error)
         sample_prediction_errors.append(sample_prediction_error)
         
     mean_prediction_loss = np.mean(prediction_errors)
-    mean_sample_loss = np.mean(sample_residual_errors)
     mean_sample_prediction_loss = np.mean(sample_prediction_errors)
 
     median_prediction_loss = np.percentile(prediction_errors, 50)
-    median_sample_loss = np.percentile(sample_residual_errors, 50)
     median_sample_prediction_loss = np.percentile(sample_prediction_errors, 50)
 
     percentile95_prediction_loss = np.percentile(prediction_errors, 95)
-    percentile95_sample_loss = np.percentile(sample_residual_errors, 95)
     percentile95_sample_prediction_loss = np.percentile(sample_prediction_errors, 95)
 
-    print('residual error (bucket sampling)\n')
-    print('\n'.join([str(l) for l in sample_residual_errors]), '\n\n')
+    _helpers.print_kfold(kfold)
+    
     print('prediction error\n')
     print('\n'.join([str(l) for l in prediction_errors]), '\n\n')
     print('prediction error (bucket sampling)\n')
     print('\n'.join([str(l) for l in sample_prediction_errors]), '\n\n')
 
-    print('Mean sample_loss/prediction_loss/sample_predction_loss', mean_sample_loss, mean_prediction_loss, mean_sample_prediction_loss)
-    print('Median sample_loss/prediction_loss/sample_prediction_loss', median_sample_loss, median_prediction_loss, median_sample_prediction_loss)
-    print('95th percentile sample_loss/prediction_loss/sample_prediction_loss', percentile95_sample_loss, percentile95_prediction_loss, percentile95_sample_prediction_loss)
+    print('Mean prediction_loss/sample_predction_loss', mean_prediction_loss, mean_sample_prediction_loss)
+    print('Median prediction_loss/sample_prediction_loss', median_prediction_loss, median_sample_prediction_loss)
+    print('95th percentile prediction_loss/sample_prediction_loss', percentile95_prediction_loss, percentile95_sample_prediction_loss)
 
-
-def get_forecasts():
-    residual_models_predictions = {}
-
-    for name, group in df:
-
-        group = datasets.remove_outliers(group)
-
-        group['domain_latency'] = domain_model.predict(name, group['wip'], domain_model_parameters[name])
-        group['residuals'] = group['domain_latency'] - group['latency']
-
-        infile = open('../../models/api_metrics/27_residual_mae_early_stopping/_scalars/scalerX' + name.replace('/', '_') + '.pkl', 'rb')
-        scalerX = pkl.load(infile)
-        infile.close()
-
-        model = keras.models.load_model('../../models/api_metrics/27_residual_mae_early_stopping/' + name.replace('/', '_'), compile=False)
-
-        x = np.arange(0, group['wip'].max() + 0.1 , 0.01)
-        domain_latency = domain_model.predict(name, x, domain_model_parameters[name])
-        y = model.predict(scalerX.transform(x.reshape(-1, 1)))
-        y = domain_latency - y.flatten()
-        residual_models_predictions[name] = y
-
-        # print(name, y)
-
-    return residual_models_predictions
 
 # train_models()
-# evaluate_models()
+evaluate_models()

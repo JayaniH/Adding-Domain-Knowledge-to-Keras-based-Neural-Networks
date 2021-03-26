@@ -258,27 +258,5 @@ def evaluate_models():
     print('Median loss/prediction_error/sample_error', median_prediction_error, median_sample_error)
     print('95th percentile prediction_error/sample_error', percentile95_prediction_error, percentile95_sample_error)
 
-
-
-def get_forecasts():
-    ml_predictions = {}
-
-    for name, group in df:
-
-        group = datasets.remove_outliers(group)
-
-        infile = open('../../models/api_metrics/1_ml_model/_scalars/scaler_' + name.replace('/', '_') + '.pkl', 'rb')
-        scaler = pkl.load(infile)
-        infile.close()
-
-        model = keras.models.load_model('../../models/api_metrics/1_ml_model/' + name.replace('/', '_'), compile=False)
-
-        # predictions for ml curve
-        x = np.arange(0, group['wip'].max() + 0.1 , 0.01)
-        y = model.predict(scaler.transform(x.reshape(-1, 1)))
-        ml_predictions[name] = y
-
-    return ml_predictions
-
 # train_models()
 evaluate_models()
