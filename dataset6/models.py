@@ -23,9 +23,9 @@ def create_model(dim):
 
 def create_residual_model(dim):
     model = Sequential()
-    model.add(Dense(6, input_dim=dim, activation="relu"))
-    # model.add(Dense(8, activation="relu"))
-    # model.add(Dense(6, activation="relu"))
+    model.add(Dense(12, input_dim=dim, activation="relu"))
+    model.add(Dense(8, activation="relu"))
+    model.add(Dense(6, activation="relu"))
     model.add(Dense(4, activation="relu"))
     model.add(Dense(1, activation="linear"))
 
