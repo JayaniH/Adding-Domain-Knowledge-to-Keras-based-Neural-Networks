@@ -80,11 +80,11 @@ def create_model_with_cross_validation():
     return param_estimates, errors
 
 
-def get_parameters():
+def get_parameters(df):
     param_estimates = []
 
-    df = pd.read_csv('Ballerina_Dataset_truncated.csv', sep=',')
-    df = dataset.remove_outliers1(df)
+    # df = pd.read_csv('Ballerina_Dataset_truncated.csv', sep=',')
+    # df = dataset.remove_outliers1(df)
     kf = KFold(n_splits=10, shuffle = True, random_state=14)
     i = 0
 
@@ -104,7 +104,7 @@ def evaluate_model():
     df = pd.read_csv('Ballerina_Dataset_truncated.csv', sep=',')
     df = dataset.remove_outliers1(df)
 
-    params = get_parameters()
+    params = get_parameters(df)
     [s, k, l] = params
     print('[RESULT] Estimated patameters = ', params)
 
@@ -128,6 +128,6 @@ def predict(x, params):
     return y
 
 
-create_model_with_cross_validation()
+# create_model_with_cross_validation()
 # print(get_parameters())
 # evaluate_model()
