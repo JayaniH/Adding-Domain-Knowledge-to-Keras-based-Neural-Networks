@@ -68,14 +68,14 @@ def train_model(train_i, test_i, i):
 
 def evaluate_model(train_i, test_i, i):
 
-    infile = open('../../models/springboot2/new_model/_scalars/scalerX_' + str(i+1) +'.pkl', 'rb')
+    infile = open('../../models/springboot2/ml_model_641_outliers_removed/_scalars/scalerX_' + str(i+1) +'.pkl', 'rb')
     scalerX = pkl.load(infile)
     infile.close()
 
     train = df.iloc[train_i]
     test = df.iloc[test_i]
 
-    model = keras.models.load_model('../../models/springboot2/new_model/K' + str(i+1), compile=False)
+    model = keras.models.load_model('../../models/springboot2/ml_model_641_outliers_removed/K' + str(i+1), compile=False)
 
     # preds for dataset
     testX = scalerX.transform(test[['concurrent_users', 'heap_size', 'collector', 'size',  'use_case']].values.reshape(-1,5))
@@ -89,9 +89,11 @@ def evaluate_model(train_i, test_i, i):
 
     results_df = pd.DataFrame({'concurrent_users': test['concurrent_users'], 'heap_size': test['heap_size'], 'collector': test['collector'], 'size': test['size'], 'use_case': test['use_case'], 'latency': testY, 'prediction': latency_prediction.flatten()})
     # print(results_df)
-    results_df.to_csv('../../models/springboot2/new_model/results/K' + str(i+1) + '.csv', sep=",", index= False)
+    results_df.to_csv('../../models/springboot2/ml_model_641_outliers_removed/results/K' + str(i+1) + '.csv', sep=",", index= False)
 
     rmse, mae, mape = _helpers.get_error(testY.values, latency_prediction.flatten())
+
+    _helpers.plot_mape(testY.values, latency_prediction.flatten())
     
     return rmse, mae, mape
 

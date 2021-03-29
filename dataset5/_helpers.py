@@ -37,6 +37,18 @@ def plot_curve(df, x, y):
     # plt.savefig('../../Plots/_api_manager/18_domain_model_minimization_eq2_regularization_param_10000a_100b_10a1/' + str(i+1) + '_cores.png')
     plt.close()
 
+def plot_mape(y_true, y_pred):
+    ape = np.abs((y_true - y_pred)/y_true)*100 
+    plt.scatter(y_true, ape, label='absolute percentage error')
+
+    plt.title('MAPE')
+    plt.xlabel('actual_latency')
+    plt.ylabel('absolute_percentage_error')
+    plt.legend()
+    plt.show()
+    # plt.savefig('../../Plots/_api_manager/18_domain_model_minimization_eq2_regularization_param_10000a_100b_10a1/' + str(i+1) + '_cores.png')
+    plt.close()
+
 def print_parameters_and_errors(param_estimates, errors):
     print('----------------------')
     print("Parameter Estimates\n")
