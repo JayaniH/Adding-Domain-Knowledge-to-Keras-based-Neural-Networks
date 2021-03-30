@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 def print_predictions(y_true, y_pred):
     print('\navg_response_time:\n','\n'.join([str(val) for val in y_true]))
-    print('\npredicted avg_response_time:\n', '\n'.join([str(val) for val in y_true]))
+    print('\npredicted avg_response_time:\n', '\n'.join([str(val) for val in y_pred]))
 
 def plot_curve(df, x, y):
     plt.scatter(df['concurrent_users'], df['avg_response_time'], label='actual data')
@@ -25,8 +25,8 @@ def get_average_error(error):
     print('[RESULT] mean error = ', mean_error)
     return mean_error
 
-def get_error(test, residual_prediction, response_time__prediction):
-    rmse = np.sqrt(np.mean(np.square(test['avg_response_time'].values - response_time__prediction)))
+def get_error(test, residual_prediction, response_time_prediction):
+    rmse = np.sqrt(np.mean(np.square(test['avg_response_time'].values - response_time_prediction)))
     # mae = np.mean(np.abs(test['avg_response_time'].values - pred_response_time))
     domain_error = np.sqrt(np.mean(np.square(test['domain_prediction'] - test['avg_response_time'])))
     residual_error = np.sqrt(np.mean(np.square(test['residuals'] - residual_prediction)))
