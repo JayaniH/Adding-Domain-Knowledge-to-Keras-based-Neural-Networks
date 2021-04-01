@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 
 def truncate_dataset(infile, outfile):
     df = pd.read_csv(infile, sep=',')
+    df = df[df['Error %'] < 5.0]
     df = df[['Name', 'Concurrent Users', 'Message Size (Bytes)', 'Sleep Time (ms)', 'Average (ms)']]
     df = df.rename(columns={'Name': 'name', 'Concurrent Users': 'concurrent_users', 'Message Size (Bytes)': 'msg_size', 'Sleep Time (ms)': 'sleep_time', 'Average (ms)': 'latency'})
     df = df.replace({
@@ -14,7 +15,7 @@ def truncate_dataset(infile, outfile):
 
 def plot(file):
     df = pd.read_csv(file, sep=',')
-    df = remove_outliers1(df)
+    # df = remove_outliers1(df)
     print(df.count())
     plt.scatter(df['concurrent_users'], df['latency'])
     plt.show()

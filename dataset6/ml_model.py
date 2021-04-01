@@ -45,10 +45,10 @@ def train_model(train_i, test_i, i):
     opt = Adam(learning_rate=0.001)
     model.compile(loss=root_mean_squared_error, optimizer=opt)
 
-    es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=10)
+    es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=25)
 
     print('[INFO] training model...')
-    history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=200, batch_size=4, callbacks=[es])
+    history = model.fit(x=trainX, y=trainY, validation_data=(testX, testY), epochs=1000, batch_size=4, callbacks=[es])
 
     # save model
     model.save('../../models/ballerina/new_model/K' + str(i+1))
