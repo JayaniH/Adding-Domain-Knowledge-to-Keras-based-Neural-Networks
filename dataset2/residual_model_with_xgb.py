@@ -22,7 +22,6 @@ def root_mean_squared_error(y_true, y_pred):
 print('[INFO] loading data...')
 df = pd.read_csv('summary_truncated.csv', sep=',')
 
-# fit domain model parameters
 
 def train_model(i):
     random.seed(i*2)
