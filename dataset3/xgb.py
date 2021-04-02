@@ -30,7 +30,7 @@ def train_model(train_i, test_i, i):
     trainX = train[['concurrent_users', 'cores', 'workload_mix']].values.reshape(-1,3)
     testX = test[['concurrent_users', 'cores', 'workload_mix']].values.reshape(-1,3)
 
-    xg_reg = xgb.XGBRegressor(objective ='reg:squarederror', colsample_bytree = 0.3, learning_rate = 0.1, max_depth = 5, alpha = 10, n_estimators = 10)
+    xg_reg = xgb.XGBRegressor(objective ='reg:squarederror', colsample_bytree = 1, learning_rate = 0.5, max_depth = 6, alpha = 0, n_estimators = 10)
 
     xg_reg.fit(trainX, trainY)
     outfile = open("../../models/tpcw/new_model/xgb_" + str(i+1) + ".pkl", "wb")
