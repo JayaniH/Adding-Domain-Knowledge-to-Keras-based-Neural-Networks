@@ -39,7 +39,7 @@ def train_model(i):
     trainX = train[['scenario_passthrough', 'scenario_transformation', 'msg_size', 'concurrent_users']].values.reshape(-1,4)
     testX = test[['scenario_passthrough', 'scenario_transformation', 'msg_size', 'concurrent_users']].values.reshape(-1,4)
 
-    xg_reg = xgb.XGBRegressor(objective ='reg:squarederror', colsample_bytree = 0.3, learning_rate = 0.1, max_depth = 5, alpha = 10, n_estimators = 10)
+    xg_reg = xgb.XGBRegressor(objective ='reg:squarederror', colsample_bytree = 1, learning_rate = 0.5, max_depth = 6, alpha = 0, n_estimators = 10)
 
     xg_reg.fit(trainX, trainY)
     outfile = open("../../models/api_manager/new_model/xgb_" + str(i) + ".pkl", "wb")
@@ -64,7 +64,7 @@ def evaluate_model(i):
 
     (train, test) = train_test_split(df, test_size=0.3, random_state=seed)
 
-    infile = open("../../models/api_manager/18_xgb/xgb_" + str(i) + ".pkl", "rb")
+    infile = open("../../models/api_manager/new_model/xgb_" + str(i) + ".pkl", "rb")
     xg_reg = pkl.load(infile)
     infile.close()
 
