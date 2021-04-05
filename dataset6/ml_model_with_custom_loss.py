@@ -27,7 +27,7 @@ def custom_loss(y, y_pred):
     # y_true=K.print_tensor(y_true)
     # domain_latency=K.print_tensor(domain_latency)
 
-    return K.sqrt(K.mean(K.square(y_pred - y_true))) +  (0.1 * K.sqrt(K.mean(K.square(domain_prediction - y_pred))))
+    return K.sqrt(K.mean(K.square(y_pred - y_true))) +  (0.001 * K.sqrt(K.mean(K.square(domain_prediction - y_pred))))
 
 # load data
 print('[INFO] loading data...')
